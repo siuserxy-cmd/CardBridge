@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  digital-shop:
+    build: .
+    container_name: digital-shop
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=your-secret-key-change-this
+      - ADMIN_EMAIL=admin@example.com
+      - ADMIN_PASSWORD=admin123456
+    volumes:
+      - ./database:/app/database
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

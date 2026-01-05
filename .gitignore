@@ -1,0 +1,28 @@
+# 依赖包
+node_modules/
+
+# 环境变量（包含敏感信息）
+.env
+
+# 数据库文件
+database/
+*.db
+*.db-journal
+
+# 日志文件
+logs/
+*.log
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 临时文件
+tmp/
+temp/

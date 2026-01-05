@@ -1,0 +1,75 @@
+const express = require('express');
+const { dbGet, dbAll, dbRun } = require('../utils/database');
+
+const router = express.Router();
+
+// ============================================
+// 获取所有商品（前台）
+// ============================================
+router.get('/', async (req, res) => {
+    try {
+        const products = await dbAll(`
+            SELECT
+                p.id,
+                p.name,
+                p.description,
+                p.price,
+                p.stock,
+                p.status,
+                COUNT(c.id) as available_cards
+            FROM products p
+            LEFT JOIN cards c ON p.id = c.product_id AND c.status = 'available'
+            GROUP BY p.id
+            ORDER BY p.created_at DESC
+        `);
+
+        // 更新商品状态
+        for (const product of products) {
+            const newStatus = product.available_cards > 0 ? 'in_stock' : 'out_of_stock';
+            if (product.status !== newStatus) {
+                await dbRun('UPDATE products SET status = ?, stock = ? WHERE id = ?', [
+                    newStatus,
+                    product.available_cards,
+                    product.id
+                ]);
+                product.status = newStatus;
+                product.stock = product.available_cards;
+            }
+        }
+
+        res.json(products);
+    } catch (error) {
+        console.error('获取商品列表错误:', error);
+        res.status(500).json({ error: '获取商品列表失败' });
+    }
+});
+
+// ============================================
+// 获取单个商品详情
+// ============================================
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const product = await dbGet(`
+            SELECT
+                p.*,
+                COUNT(c.id) as available_cards
+            FROM products p
+            LEFT JOIN cards c ON p.id = c.product_id AND c.status = 'available'
+            WHERE p.id = ?
+            GROUP BY p.id
+        `, [id]);
+
+        if (!product) {
+            return res.status(404).json({ error: '商品不存在' });
+        }
+
+        res.json(product);
+    } catch (error) {
+        console.error('获取商品详情错误:', error);
+        res.status(500).json({ error: '获取商品详情失败' });
+    }
+});
+
+module.exports = router;
