@@ -56,6 +56,11 @@ app.get('/product/:id', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'product.html'));
 });
 
+// 支付页面
+app.get('/payment/:orderNo', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'payment.html'));
+});
+
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
 });

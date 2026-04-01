@@ -143,9 +143,45 @@ router.post('/create', authenticateToken, async (req, res) => {
 });
 
 // ============================================
+// 查询订单支付状态（供前端轮询）
+// ============================================
+router.get('/status/:orderNo', async (req, res) => {
+    try {
+        const { orderNo } = req.params;
+        const order = await dbGet(`
+            SELECT o.id, o.transaction_id, o.payment_status, o.amount, o.quantity,
+                   p.name as product_name
+            FROM orders o
+            JOIN products p ON o.product_id = p.id
+            WHERE o.transaction_id = ?
+        `, [orderNo]);
+
+        if (!order) {
+            return res.status(404).json({ error: '订单不存在' });
+        }
+
+        res.json({
+            orderNo: order.transaction_id,
+            status: order.payment_status,
+            amount: order.amount,
+            quantity: order.quantity,
+            productName: order.product_name
+        });
+    } catch (error) {
+        console.error('查询订单状态错误:', error);
+        res.status(500).json({ error: '查询失败' });
+    }
+});
+
+// ============================================
 // 测试支付（仅用于开发测试）
 // ============================================
 router.get('/test-pay/:orderNo', async (req, res) => {
+    // 生产环境禁止使用测试支付
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).send('<h1>测试支付在生产环境下已禁用</h1>');
+    }
+
     try {
         const { orderNo } = req.params;
 

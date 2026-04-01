@@ -4,14 +4,10 @@ services:
   digital-shop:
     build: .
     container_name: digital-shop
+    env_file:
+      - .env
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - JWT_SECRET=your-secret-key-change-this
-      - ADMIN_EMAIL=admin@example.com
-      - ADMIN_PASSWORD=admin123456
     volumes:
       - ./database:/app/database
     restart: unless-stopped
@@ -20,3 +16,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_tunnel
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN}
+    depends_on:
+      - digital-shop
+    restart: unless-stopped
