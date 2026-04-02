@@ -487,8 +487,36 @@ async function init() {
 
 function renderPayment() {
     expireTime = Date.now() + 30 * 60 * 1000; // 30 minutes
-    const isTest = orderData.isTestMode;
+    const isManual = orderData.manualMode;
     const payUrl = orderData.payUrl || orderData.codeUrl || '';
+    const qrImage = orderData.qrImage || '';
+    const contactInfo = orderData.contactInfo || '';
+    const method = orderData.paymentMethod || '';
+    const methodLabel = method === 'wechat' ? '微信' : method === 'alipay' ? '支付宝' : '';
+
+    // Determine QR area content
+    let qrHtml, hintText, actionHtml;
+
+    if (isManual) {
+        // Manual mode: show personal payment QR image
+        qrHtml = `<img src="${escHtml(qrImage)}" alt="${methodLabel}收款码" style="width:100%;height:auto;">`;
+        hintText = `请使用${methodLabel}扫码转账 <strong style="color:var(--accent);">¥${parseFloat(orderData.amount || 0).toFixed(2)}</strong>`;
+        actionHtml = `
+            <button class="btn-test-pay" id="btnMarkPaid" onclick="markPaid()" style="margin-top:1.2rem;font-size:0.95rem;padding:0.75rem 1.8rem;">
+                我已支付
+            </button>
+            ${contactInfo ? `<p style="margin-top:0.8rem;color:var(--text-dim);font-size:0.78rem;">${escHtml(contactInfo)}</p>` : ''}
+        `;
+    } else if (payUrl) {
+        // SDK mode: generate dynamic QR
+        qrHtml = '<canvas id="qrCanvas"></canvas>';
+        hintText = `请使用${methodLabel || '微信或支付宝'}扫码支付`;
+        actionHtml = '';
+    } else {
+        qrHtml = '<div style="padding:2rem;color:#333;font-size:0.88rem;">暂无收款码</div>';
+        hintText = '请联系客服完成支付';
+        actionHtml = contactInfo ? `<p style="margin-top:0.8rem;color:var(--text-soft);font-size:0.88rem;">${escHtml(contactInfo)}</p>` : '';
+    }
 
     document.getElementById('app').innerHTML = `
         <!-- Steps bar: step 2 active -->
@@ -530,14 +558,10 @@ function renderPayment() {
                     <span class="order-info-value amount">¥${parseFloat(orderData.amount || 0).toFixed(2)}</span>
                 </div>
 
-                <div class="qr-area" id="qrArea">
-                    ${isTest
-                        ? '<div style="padding:2rem;color:#333;font-size:0.88rem;">测试模式<br>无需扫码</div>'
-                        : '<canvas id="qrCanvas"></canvas>'}
-                </div>
-                <p class="qr-hint">${isTest ? '测试环境，点击下方按钮模拟支付' : '请使用微信或支付宝扫码支付'}</p>
+                <div class="qr-area" id="qrArea">${qrHtml}</div>
+                <p class="qr-hint">${hintText}</p>
 
-                ${isTest ? `<button class="btn-test-pay" onclick="testPay()">模拟支付成功</button>` : ''}
+                ${actionHtml}
 
                 <div style="margin-top:1.2rem;">
                     <div class="timer-bar" id="timerBar">
@@ -554,8 +578,8 @@ function renderPayment() {
         </div>
     `;
 
-    // Generate QR code if not test mode
-    if (!isTest && payUrl) {
+    // Generate QR code for SDK mode
+    if (!isManual && payUrl) {
         const canvas = document.getElementById('qrCanvas');
         if (canvas && typeof QRCode !== 'undefined') {
             QRCode.toCanvas(canvas, payUrl, { width: 220, margin: 2 });
@@ -568,6 +592,12 @@ function renderPayment() {
 
 function renderSuccess(data) {
     const d = data || orderData;
+    const isRecharge = d?.deliveryType === 'auto_recharge';
+    const successMsg = isRecharge
+        ? '充值请求已提交，系统正在为你的 ChatGPT 账号充值。结果将发送至你的邮箱。'
+        : '卡密已发送到您的邮箱，请注意查收。';
+    const step3Label = isRecharge ? '自动充值' : '获取卡密';
+
     document.getElementById('app').innerHTML = `
         <!-- Steps bar: all done -->
         <div class="steps-bar">
@@ -583,7 +613,7 @@ function renderSuccess(data) {
             <div class="step-line done"></div>
             <div class="step-item">
                 <div class="step-circle done">&#10003;</div>
-                <span class="step-label done">获取卡密</span>
+                <span class="step-label done">${step3Label}</span>
             </div>
         </div>
 
@@ -599,7 +629,7 @@ function renderSuccess(data) {
             <div class="success-panel">
                 <div class="success-icon">&#10003;</div>
                 <div class="success-title">支付成功！</div>
-                <p class="success-sub">卡密已发送到您的邮箱，请注意查收。</p>
+                <p class="success-sub">${successMsg}</p>
 
                 <div class="order-info" style="margin-bottom:1.5rem;">
                     <span class="order-info-label">订单号:</span>
@@ -610,12 +640,19 @@ function renderSuccess(data) {
                     <span class="order-info-value amount">¥${parseFloat(d?.amount || 0).toFixed(2)}</span>
                 </div>
 
+                ${isRecharge ? '<div id="rechargeStatusArea" style="margin-bottom:1.2rem;"><div class="status-msg"><div class="spinner"></div><span>充值处理中，请稍候...</span></div></div>' : ''}
+
                 <button class="btn-home" onclick="location.href='/'">返回首页</button>
             </div>
         </div>
     `;
 
     stopTimers();
+
+    // 充值类订单继续轮询充值状态
+    if (isRecharge) {
+        pollRechargeStatus();
+    }
 }
 
 function startTimer() {
@@ -644,7 +681,16 @@ function startPolling() {
             if (!res.ok) return;
             const data = await res.json();
             if (data.status === 'paid') {
+                // Merge deliveryType from order data
+                if (orderData) data.deliveryType = data.deliveryType || orderData.deliveryType;
                 renderSuccess(data);
+            } else if (data.status === 'confirming') {
+                const msg = document.getElementById('statusMsg');
+                if (msg) msg.innerHTML = '<span style="color:var(--warn);">已提交，等待卖家确认收款...</span>';
+            } else if (data.status === 'cancelled') {
+                const msg = document.getElementById('statusMsg');
+                if (msg) msg.innerHTML = '<span style="color:var(--danger);">订单已取消</span>';
+                stopTimers();
             }
         } catch (e) {}
     }, 3000);
@@ -655,25 +701,45 @@ function stopTimers() {
     if (pollInterval) clearInterval(pollInterval);
 }
 
-async function testPay() {
-    const btn = document.querySelector('.btn-test-pay');
-    if (btn) { btn.disabled = true; btn.textContent = '处理中...'; }
+async function pollRechargeStatus() {
+    const rechargePoll = setInterval(async () => {
+        try {
+            const res = await fetch(`${API}/orders/recharge-status/${orderNo}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            const area = document.getElementById('rechargeStatusArea');
+            if (!area) { clearInterval(rechargePoll); return; }
+
+            if (data.rechargeStatus === 'success') {
+                area.innerHTML = '<div style="color:var(--success);font-weight:600;">充值成功！请查看你的 ChatGPT 账号。</div>';
+                clearInterval(rechargePoll);
+            } else if (data.rechargeStatus === 'failed') {
+                area.innerHTML = '<div style="color:var(--danger);">充值失败，请联系客服处理。</div>';
+                clearInterval(rechargePoll);
+            }
+        } catch (e) {}
+    }, 5000);
+}
+
+async function markPaid() {
+    const btn = document.getElementById('btnMarkPaid');
+    if (btn) { btn.disabled = true; btn.textContent = '提交中...'; }
 
     try {
-        const res = await fetch(`${API}/orders/test-pay/${orderNo}`);
-        // Test pay endpoint returns HTML, but we just need to trigger it
-        // Then poll will catch the status change
-        setTimeout(async () => {
-            const statusRes = await fetch(`${API}/orders/status/${orderNo}`);
-            if (statusRes.ok) {
-                const data = await statusRes.json();
-                if (data.status === 'paid') {
-                    renderSuccess(data);
-                }
-            }
-        }, 1000);
+        const res = await fetch(`${API}/orders/mark-paid/${orderNo}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok) {
+            if (btn) { btn.textContent = '已提交，等待确认'; btn.style.opacity = '0.6'; }
+            const msg = document.getElementById('statusMsg');
+            if (msg) msg.innerHTML = '<span style="color:var(--warn);">已提交，等待卖家确认收款...</span>';
+        } else {
+            alert(data.error || '提交失败');
+            if (btn) { btn.disabled = false; btn.textContent = '我已支付'; }
+        }
     } catch (e) {
-        if (btn) { btn.disabled = false; btn.textContent = '模拟支付成功'; }
+        alert('网络错误，请重试');
+        if (btn) { btn.disabled = false; btn.textContent = '我已支付'; }
     }
 }
 

@@ -97,19 +97,24 @@ async function loadProducts() {
             return;
         }
 
-        tbody.innerHTML = products.map(p => `
+        tbody.innerHTML = products.map(p => {
+            const deliveryLabel = p.delivery_type === 'auto_recharge'
+                ? '<span class="badge" style="background:rgba(168,85,247,0.15);color:#a855f7;border-color:rgba(168,85,247,0.3);">自动充值</span>'
+                : '<span class="badge" style="background:rgba(121,242,170,0.1);color:#79f2aa;border-color:rgba(121,242,170,0.2);">邮件发卡</span>';
+            return `
             <tr>
                 <td>${p.id}</td>
                 <td>${escapeHtml(p.name)}</td>
                 <td>¥${p.price.toFixed(2)}</td>
                 <td>${p.stock}</td>
+                <td>${deliveryLabel}</td>
                 <td><span class="badge ${p.status === 'in_stock' ? 'badge-success' : 'badge-danger'}">${p.status === 'in_stock' ? '有货' : '售罄'}</span></td>
                 <td>
                     <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;" onclick="openAddCardsModal(${p.id})">添加卡密</button>
                     <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: #dc2626;" onclick="deleteProduct(${p.id})">删除</button>
                 </td>
             </tr>
-        `).join('');
+        `}).join('');
     } catch (error) {
         console.error('加载商品列表失败:', error);
     }
@@ -131,17 +136,37 @@ async function loadOrders() {
             return;
         }
 
-        tbody.innerHTML = orders.map(o => `
-            <tr>
-                <td>${o.id}</td>
-                <td>${escapeHtml(o.email)}</td>
-                <td>${escapeHtml(o.product_name)}</td>
-                <td>¥${o.amount.toFixed(2)}</td>
-                <td>${o.payment_method === 'alipay' ? '支付宝' : '微信'}</td>
-                <td><span class="badge ${o.payment_status === 'paid' ? 'badge-success' : 'badge-warning'}">${o.payment_status === 'paid' ? '已支付' : '待支付'}</span></td>
-                <td>${new Date(o.created_at).toLocaleString()}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = orders.map(o => {
+            let statusBadge, actionHtml = '';
+            switch (o.payment_status) {
+                case 'paid':
+                    statusBadge = '<span class="badge badge-success">已支付</span>';
+                    break;
+                case 'confirming':
+                    statusBadge = '<span class="badge badge-warning" style="background:rgba(255,216,106,0.15);color:#ffd86a;border-color:rgba(255,216,106,0.3);">待确认</span>';
+                    actionHtml = `
+                        <button class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.8rem;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;" onclick="confirmOrder(${o.id})">确认收款</button>
+                        <button class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.8rem;background:#dc2626;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-left:4px;" onclick="rejectOrder(${o.id})">拒绝</button>
+                    `;
+                    break;
+                case 'cancelled':
+                    statusBadge = '<span class="badge badge-danger">已取消</span>';
+                    break;
+                default:
+                    statusBadge = '<span class="badge badge-warning">待支付</span>';
+            }
+            return `
+                <tr${o.payment_status === 'confirming' ? ' style="background:rgba(255,216,106,0.05);"' : ''}>
+                    <td>${o.id}</td>
+                    <td>${escapeHtml(o.email || o.buyer_email || '-')}</td>
+                    <td>${escapeHtml(o.product_name)}</td>
+                    <td>¥${o.amount.toFixed(2)}</td>
+                    <td>${o.payment_method === 'alipay' ? '支付宝' : '微信'}</td>
+                    <td>${statusBadge} ${actionHtml}</td>
+                    <td>${new Date(o.created_at).toLocaleString()}</td>
+                </tr>
+            `;
+        }).join('');
     } catch (error) {
         console.error('加载订单列表失败:', error);
     }
@@ -163,6 +188,8 @@ async function handleAddProduct(e) {
     const name = document.getElementById('productName').value;
     const description = document.getElementById('productDescription').value;
     const price = parseFloat(document.getElementById('productPrice').value);
+    const deliveryTypeEl = document.getElementById('productDeliveryType');
+    const delivery_type = deliveryTypeEl ? deliveryTypeEl.value : 'email';
 
     try {
         const token = localStorage.getItem('token');
@@ -172,7 +199,7 @@ async function handleAddProduct(e) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ name, description, price })
+            body: JSON.stringify({ name, description, price, delivery_type })
         });
 
         const data = await response.json();
@@ -274,6 +301,57 @@ async function handleAddCards(e) {
     } catch (error) {
         console.error('添加卡密失败:', error);
         alert('添加失败，请稍后重试');
+    }
+}
+
+// 确认收款
+async function confirmOrder(orderId) {
+    if (!confirm('确认已收到付款？确认后将自动发卡给买家。')) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/admin/orders/${orderId}/confirm`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert(data.error || '操作失败');
+            return;
+        }
+
+        alert(data.message || '已确认收款');
+        loadOrders();
+        loadStats();
+    } catch (error) {
+        console.error('确认收款失败:', error);
+        alert('操作失败，请重试');
+    }
+}
+
+// 拒绝订单
+async function rejectOrder(orderId) {
+    if (!confirm('确定要拒绝此订单吗？')) return;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/admin/orders/${orderId}/reject`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert(data.error || '操作失败');
+            return;
+        }
+
+        alert('订单已拒绝');
+        loadOrders();
+    } catch (error) {
+        console.error('拒绝订单失败:', error);
+        alert('操作失败，请重试');
     }
 }
 

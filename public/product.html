@@ -766,10 +766,27 @@ function renderPage() {
                         <div class="buy-title">立即购买</div>
 
                         <div class="form-group">
-                            <label class="form-label" for="buyerEmail">接收卡密的邮箱地址</label>
+                            <label class="form-label" for="buyerEmail">接收通知的邮箱地址</label>
                             <input class="form-input" type="email" id="buyerEmail"
                                 placeholder="your@email.com" required autocomplete="email">
                         </div>
+
+                        ${product.delivery_type === 'auto_recharge' ? `
+                        <div class="form-group">
+                            <label class="form-label" for="chatgptToken">ChatGPT Access Token</label>
+                            <textarea class="form-input" id="chatgptToken" rows="3"
+                                placeholder="粘贴你的 ChatGPT Access Token（从浏览器获取）"
+                                style="resize:vertical;min-height:80px;" required></textarea>
+                            <p style="margin-top:0.4rem;color:var(--text-dim);font-size:0.74rem;">
+                                获取方式：登录 ChatGPT → 浏览器访问
+                                <span style="color:var(--accent);cursor:pointer;text-decoration:underline;"
+                                    onclick="window.open('https://chatgpt.com/api/auth/session','_blank')">
+                                    chatgpt.com/api/auth/session
+                                </span>
+                                → 复制全部内容
+                            </p>
+                        </div>
+                        ` : ''}
 
                         <div class="qty-row">
                             <div class="form-group" style="margin-bottom:0">
@@ -798,7 +815,10 @@ function renderPage() {
 
                         <div class="info-tip">
                             <span>!</span>
-                            <div>付款成功后，卡密将自动发送到你填写的邮箱。请确认邮箱地址准确无误。</div>
+                            <div>${product.delivery_type === 'auto_recharge'
+                                ? '付款成功后，系统将自动为你的 ChatGPT 账号充值。充值结果会发送到你的邮箱。Token 仅用于充值，充值完成后立即删除。'
+                                : '付款成功后，卡密将自动发送到你填写的邮箱。请确认邮箱地址准确无误。'
+                            }</div>
                         </div>
                     </div>
                 </div>
@@ -832,14 +852,21 @@ function highlightTier(qty) {
 async function submitOrder(paymentMethod) {
     const email = document.getElementById('buyerEmail')?.value?.trim();
     const qty = parseInt(document.getElementById('buyQty')?.value) || 1;
+    const chatgptTokenEl = document.getElementById('chatgptToken');
+    const chatgptToken = chatgptTokenEl ? chatgptTokenEl.value.trim() : '';
 
     if (!email) {
-        alert('请填写邮箱地址，卡密将发送到该邮箱');
+        alert('请填写邮箱地址');
         document.getElementById('buyerEmail').focus();
         return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         alert('邮箱格式不正确，请重新填写');
+        return;
+    }
+    if (product.delivery_type === 'auto_recharge' && !chatgptToken) {
+        alert('请粘贴你的 ChatGPT Access Token');
+        chatgptTokenEl.focus();
         return;
     }
 
@@ -849,10 +876,13 @@ async function submitOrder(paymentMethod) {
     });
 
     try {
+        const body = { productId: product.id, quantity: qty, email, paymentMethod };
+        if (chatgptToken) body.chatgptToken = chatgptToken;
+
         const res = await fetch(`${API}/orders/guest-create`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productId: product.id, quantity: qty, email, paymentMethod })
+            body: JSON.stringify(body)
         });
         const data = await res.json();
 
@@ -867,7 +897,11 @@ async function submitOrder(paymentMethod) {
             amount: data.amount,
             quantity: data.quantity,
             productName: data.productName,
-            isTestMode: data.paymentInfo?.isTestMode || false,
+            paymentMethod: paymentMethod,
+            deliveryType: data.deliveryType || 'email',
+            manualMode: data.paymentInfo?.manualMode || false,
+            qrImage: data.paymentInfo?.qrImage || '',
+            contactInfo: data.paymentInfo?.contactInfo || '',
             payUrl: data.paymentInfo?.payUrl || data.paymentInfo?.codeUrl || ''
         }));
         window.location.href = `/payment/${data.orderNo}`;

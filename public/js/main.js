@@ -198,7 +198,10 @@ async function createOrder(paymentMethod) {
             amount: data.amount,
             quantity: data.quantity,
             productName: data.productName,
-            isTestMode: data.paymentInfo?.isTestMode || false,
+            paymentMethod: paymentMethod,
+            manualMode: data.paymentInfo?.manualMode || false,
+            qrImage: data.paymentInfo?.qrImage || '',
+            contactInfo: data.paymentInfo?.contactInfo || '',
             payUrl: data.paymentInfo?.payUrl || data.paymentInfo?.codeUrl || ''
         }));
         window.location.href = `/payment/${data.orderNo}`;

@@ -271,12 +271,13 @@
                         <th>商品名称</th>
                         <th>价格</th>
                         <th>库存</th>
+                        <th>交付方式</th>
                         <th>状态</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td colspan="6" class="loading">加载中...</td></tr>
+                    <tr><td colspan="7" class="loading">加载中...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -319,6 +320,13 @@
                 <div class="form-group">
                     <label class="form-label">价格（元）</label>
                     <input type="number" class="form-input" id="productPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">交付方式</label>
+                    <select class="form-input" id="productDeliveryType">
+                        <option value="email">邮件发卡（卡密通过邮件发送给买家）</option>
+                        <option value="auto_recharge">自动充值（通过 ifaka API 自动充值到买家账号）</option>
+                    </select>
                 </div>
                 <div class="btn-group">
                     <button type="button" class="btn btn-secondary" onclick="closeAddProductModal()">取消</button>
