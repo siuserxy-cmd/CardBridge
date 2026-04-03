@@ -1,17 +1,14 @@
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
-const path = require('path');
-const fs = require('fs');
 require('dotenv').config();
+const { resolveDatabasePath, ensureDatabaseDirectory } = require('./utils/db-path');
 
 // 数据库路径
-const dbDir = path.join(__dirname, '..', 'database');
-const dbPath = path.join(dbDir, 'shop.db');
+const dbPath = resolveDatabasePath();
+const dbDir = ensureDatabaseDirectory(dbPath);
 
-// 确保数据库目录存在
-if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-    console.log('✅ 创建数据库目录');
+if (dbDir) {
+    console.log(`📁 数据库路径: ${dbPath}`);
 }
 
 // 创建数据库连接
@@ -99,6 +96,9 @@ async function initDatabase() {
                     payment_method TEXT NOT NULL,
                     payment_status TEXT DEFAULT 'pending',
                     transaction_id TEXT,
+                    order_access_token_hash TEXT,
+                    reservation_expires_at DATETIME,
+                    payment_payload TEXT,
                     card_id INTEGER,
                     chatgpt_token TEXT,
                     recharge_task_id TEXT,

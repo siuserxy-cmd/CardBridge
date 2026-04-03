@@ -1,5 +1,6 @@
 const express = require('express');
 const { dbGet, dbAll, dbRun } = require('../utils/database');
+const { releaseExpiredReservations } = require('../utils/order-helpers');
 
 const router = express.Router();
 
@@ -8,6 +9,8 @@ const router = express.Router();
 // ============================================
 router.get('/', async (req, res) => {
     try {
+        await releaseExpiredReservations();
+
         const products = await dbAll(`
             SELECT
                 p.id,
@@ -51,6 +54,8 @@ router.get('/', async (req, res) => {
 // ============================================
 router.get('/:id', async (req, res) => {
     try {
+        await releaseExpiredReservations();
+
         const { id } = req.params;
 
         const product = await dbGet(`

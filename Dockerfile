@@ -15,6 +15,7 @@ COPY . .
 
 # 初始化数据库
 RUN npm run init-db
+RUN npm run migrate-db
 
 # 暴露端口
 EXPOSE 3000
@@ -23,4 +24,4 @@ EXPOSE 3000
 ENV NODE_ENV=production
 
 # 启动应用
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npm run init-db && npm run migrate-db && npm start"]

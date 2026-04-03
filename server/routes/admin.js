@@ -2,6 +2,7 @@ const express = require('express');
 const { dbGet, dbAll, dbRun } = require('../utils/database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { processPaymentSuccess } = require('./orders');
+const { releaseExpiredReservations, releaseOrderReservation, syncProductStock } = require('../utils/order-helpers');
 
 const router = express.Router();
 
@@ -60,14 +61,27 @@ router.delete('/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        // 检查是否有未售出的卡密
-        const cards = await dbAll('SELECT * FROM cards WHERE product_id = ? AND status = "available"', [id]);
+        const existingCard = await dbGet(
+            'SELECT id FROM cards WHERE product_id = ? LIMIT 1',
+            [id]
+        );
+        if (existingCard) {
+            return res.status(400).json({ error: '该商品仍有关联卡密，删除前请先清理卡密数据' });
+        }
+
+        const existingOrder = await dbGet(
+            'SELECT id FROM orders WHERE product_id = ? LIMIT 1',
+            [id]
+        );
+        if (existingOrder) {
+            return res.status(400).json({ error: '该商品已有订单记录，不能直接删除' });
+        }
 
         await dbRun('DELETE FROM products WHERE id = ?', [id]);
 
         res.json({
             message: '商品删除成功',
-            unusedCards: cards.length
+            unusedCards: 0
         });
     } catch (error) {
         console.error('删除商品错误:', error);
@@ -107,8 +121,7 @@ router.post('/cards', async (req, res) => {
             }
 
             // 更新库存
-            const stockResult = await dbGet(`SELECT COUNT(*) as count FROM cards WHERE product_id = ? AND status = 'available'`, [productId]);
-            await dbRun(`UPDATE products SET stock = ?, status = ? WHERE id = ?`, [stockResult.count, stockResult.count > 0 ? 'in_stock' : 'out_of_stock', productId]);
+            await syncProductStock(productId);
 
             return res.json({ message: `成功导入 ${successCount} 个 CDK`, successCount, totalCount: lines.length });
         }
@@ -134,8 +147,7 @@ router.post('/cards', async (req, res) => {
             }
         }
 
-        const stockResult = await dbGet(`SELECT COUNT(*) as count FROM cards WHERE product_id = ? AND status = 'available'`, [productId]);
-        await dbRun(`UPDATE products SET stock = ?, status = ? WHERE id = ?`, [stockResult.count, stockResult.count > 0 ? 'in_stock' : 'out_of_stock', productId]);
+        await syncProductStock(productId);
 
         res.json({ message: `成功添加 ${successCount} 张卡密`, successCount, totalCount: cards.length });
     } catch (error) {
@@ -194,20 +206,14 @@ router.delete('/cards/:id', async (req, res) => {
             return res.status(404).json({ error: '卡密不存在' });
         }
 
-        if (card.status === 'sold') {
-            return res.status(400).json({ error: '已售出的卡密无法删除' });
+        if (['sold', 'reserved'].includes(card.status)) {
+            return res.status(400).json({ error: '已售出或已预占的卡密无法删除' });
         }
 
         await dbRun('DELETE FROM cards WHERE id = ?', [id]);
 
         // 更新商品库存
-        const stockResult = await dbGet(`
-            SELECT COUNT(*) as count FROM cards WHERE product_id = ? AND status = 'available'
-        `, [card.product_id]);
-
-        await dbRun(`
-            UPDATE products SET stock = ?, status = ? WHERE id = ?
-        `, [stockResult.count, stockResult.count > 0 ? 'in_stock' : 'out_of_stock', card.product_id]);
+        await syncProductStock(card.product_id);
 
         res.json({ message: '卡密删除成功' });
     } catch (error) {
@@ -223,9 +229,23 @@ router.delete('/cards/:id', async (req, res) => {
 // 获取所有订单
 router.get('/orders', async (req, res) => {
     try {
+        await releaseExpiredReservations();
+
         const orders = await dbAll(`
             SELECT
-                o.*,
+                o.id,
+                o.user_id,
+                o.buyer_email,
+                o.product_id,
+                o.quantity,
+                o.amount,
+                o.payment_method,
+                o.payment_status,
+                o.transaction_id,
+                o.card_id,
+                o.recharge_status,
+                o.created_at,
+                o.paid_at,
                 COALESCE(u.email, o.buyer_email) as email,
                 p.name as product_name,
                 c.card_number
@@ -254,6 +274,9 @@ router.post('/orders/:id/confirm', async (req, res) => {
         if (!order) {
             return res.status(404).json({ error: '订单不存在' });
         }
+        if (!['pending', 'confirming'].includes(order.payment_status)) {
+            return res.status(400).json({ error: '该订单当前无法确认收款' });
+        }
         if (order.payment_status === 'paid') {
             return res.json({ message: '订单已完成' });
         }
@@ -270,10 +293,7 @@ router.post('/orders/:id/confirm', async (req, res) => {
 router.post('/orders/:id/reject', async (req, res) => {
     try {
         const { id } = req.params;
-        await dbRun(
-            "UPDATE orders SET payment_status = 'cancelled' WHERE id = ?",
-            [id]
-        );
+        await releaseOrderReservation(id, 'cancelled');
         res.json({ message: '订单已拒绝' });
     } catch (error) {
         console.error('拒绝订单错误:', error);
@@ -286,6 +306,8 @@ router.post('/orders/:id/reject', async (req, res) => {
 // ============================================
 router.get('/stats', async (req, res) => {
     try {
+        await releaseExpiredReservations();
+
         // 总订单数
         const totalOrders = await dbGet('SELECT COUNT(*) as count FROM orders');
 

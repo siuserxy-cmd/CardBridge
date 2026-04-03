@@ -1,13 +1,18 @@
 const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { resolveDatabasePath, ensureDatabaseDirectory } = require('./db-path');
 
-const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'database', 'shop.db');
+const dbPath = resolveDatabasePath();
+ensureDatabaseDirectory(dbPath);
 
 // 创建数据库连接
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('❌ 数据库连接失败:', err.message);
     }
+});
+
+db.serialize(() => {
+    db.run('PRAGMA foreign_keys = ON');
 });
 
 // Promise 包装器：查询单行
@@ -40,9 +45,27 @@ const dbRun = (sql, params = []) => {
     });
 };
 
+const dbTransaction = async (handler) => {
+    await dbRun('BEGIN IMMEDIATE TRANSACTION');
+
+    try {
+        const result = await handler({ dbGet, dbAll, dbRun });
+        await dbRun('COMMIT');
+        return result;
+    } catch (error) {
+        try {
+            await dbRun('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('事务回滚失败:', rollbackError.message);
+        }
+        throw error;
+    }
+};
+
 module.exports = {
     db,
     dbGet,
     dbAll,
-    dbRun
+    dbRun,
+    dbTransaction
 };

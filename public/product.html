@@ -659,7 +659,10 @@ async function loadProduct() {
 
 function renderPage() {
     const inStock = product.status === 'in_stock';
-    const maxQty = product.stock || product.available_cards || 0;
+    const availableQty = product.stock || product.available_cards || 0;
+    const maxQty = product.delivery_type === 'auto_recharge'
+        ? Math.min(1, availableQty)
+        : availableQty;
 
     let tiersHtml = '';
     if (product.tiers && product.tiers.length > 0) {
@@ -793,7 +796,7 @@ function renderPage() {
                                 <label class="form-label" for="buyQty">购买数量</label>
                                 <input class="form-input" type="number" id="buyQty"
                                     min="1" max="${maxQty}" value="1"
-                                    oninput="updateTotal()" ${!inStock ? 'disabled' : ''}>
+                                    oninput="updateTotal()" ${!inStock ? 'disabled' : product.delivery_type === 'auto_recharge' ? 'readonly' : ''}>
                             </div>
                             <div class="form-group" style="margin-bottom:0">
                                 <label class="form-label">应付金额</label>
@@ -816,7 +819,7 @@ function renderPage() {
                         <div class="info-tip">
                             <span>!</span>
                             <div>${product.delivery_type === 'auto_recharge'
-                                ? '付款成功后，系统将自动为你的 ChatGPT 账号充值。充值结果会发送到你的邮箱。Token 仅用于充值，充值完成后立即删除。'
+                                ? '付款成功后，系统将自动为你的 ChatGPT 账号充值。充值结果会发送到你的邮箱。Token 会加密存储，仅用于充值，任务完成后自动清除。'
                                 : '付款成功后，卡密将自动发送到你填写的邮箱。请确认邮箱地址准确无误。'
                             }</div>
                         </div>
@@ -831,7 +834,13 @@ function renderPage() {
 }
 
 function updateTotal() {
-    const qty = parseInt(document.getElementById('buyQty')?.value) || 1;
+    const qtyInput = document.getElementById('buyQty');
+    let qty = parseInt(qtyInput?.value, 10) || 1;
+    const max = parseInt(qtyInput?.max, 10) || 1;
+
+    qty = Math.min(Math.max(1, qty), Math.max(1, max));
+    if (qtyInput) qtyInput.value = String(qty);
+
     const unitPrice = getUnitPrice(qty);
     const total = (unitPrice * qty).toFixed(2);
     const detailPriceEl = document.getElementById('detailPrice');
@@ -899,12 +908,16 @@ async function submitOrder(paymentMethod) {
             productName: data.productName,
             paymentMethod: paymentMethod,
             deliveryType: data.deliveryType || 'email',
+            accessToken: data.accessToken || '',
+            expiresAt: data.expiresAt || '',
             manualMode: data.paymentInfo?.manualMode || false,
             qrImage: data.paymentInfo?.qrImage || '',
             contactInfo: data.paymentInfo?.contactInfo || '',
-            payUrl: data.paymentInfo?.payUrl || data.paymentInfo?.codeUrl || ''
+            payUrl: data.paymentInfo?.payUrl || '',
+            codeUrl: data.paymentInfo?.codeUrl || ''
         }));
-        window.location.href = `/payment/${data.orderNo}`;
+        const securePaymentUrl = data.paymentUrl || `/payment/${encodeURIComponent(data.orderNo)}?t=${encodeURIComponent(data.accessToken || '')}`;
+        window.location.href = securePaymentUrl;
     } catch (e) {
         console.error(e);
         alert('网络错误，请稍后重试');

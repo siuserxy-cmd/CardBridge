@@ -18,6 +18,22 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+const authenticateTokenOptional = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return next();
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (!err) {
+            req.user = user;
+        }
+        next();
+    });
+};
+
 // 管理员权限验证中间件
 const requireAdmin = (req, res, next) => {
     if (!req.user || !req.user.isAdmin) {
@@ -28,5 +44,6 @@ const requireAdmin = (req, res, next) => {
 
 module.exports = {
     authenticateToken,
+    authenticateTokenOptional,
     requireAdmin
 };

@@ -213,12 +213,15 @@ async function createOrder(paymentMethod) {
             quantity: data.quantity,
             productName: data.productName,
             paymentMethod: paymentMethod,
+            accessToken: data.accessToken || '',
+            expiresAt: data.expiresAt || '',
             manualMode: data.paymentInfo?.manualMode || false,
             qrImage: data.paymentInfo?.qrImage || '',
             contactInfo: data.paymentInfo?.contactInfo || '',
-            payUrl: data.paymentInfo?.payUrl || data.paymentInfo?.codeUrl || ''
+            payUrl: data.paymentInfo?.payUrl || '',
+            codeUrl: data.paymentInfo?.codeUrl || ''
         }));
-        window.location.href = `/payment/${data.orderNo}`;
+        window.location.href = data.paymentUrl || `/payment/${encodeURIComponent(data.orderNo)}?t=${encodeURIComponent(data.accessToken || '')}`;
     } catch (error) {
         console.error('创建订单失败:', error);
         alert('创建订单失败，请稍后重试');

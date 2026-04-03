@@ -198,14 +198,18 @@
 <script>
 const API = window.location.origin + '/api';
 const orderNo = location.pathname.split('/order/')[1]?.replace(/\/$/, '') || '';
+const accessToken = new URL(window.location.href).searchParams.get('t') || '';
 
 async function loadOrder() {
     if (!orderNo) { showError('缺少订单号'); return; }
+    if (!accessToken) { showError('订单链接缺少访问令牌，请使用订单查询页重新获取。'); return; }
 
     try {
-        const res = await fetch(`${API}/orders/detail/${orderNo}`);
-        if (!res.ok) throw new Error('订单不存在');
+        const url = new URL(`${API}/orders/detail/${encodeURIComponent(orderNo)}`, window.location.origin);
+        url.searchParams.set('t', accessToken);
+        const res = await fetch(url.toString());
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '订单不存在');
         render(data);
     } catch (e) {
         showError(e.message || '加载失败');
@@ -320,7 +324,7 @@ function showError(msg) {
             <div class="loading-state">
                 <div style="font-size:2.2rem;margin-bottom:0.8rem;">!</div>
                 <div style="color:var(--text);font-size:1rem;margin-bottom:0.5rem;">${esc(msg)}</div>
-                <a href="/" style="color:var(--accent);">返回首页</a>
+                <a href="/lookup" style="color:var(--accent);">前往订单查询</a>
             </div>
         </div>`;
 }

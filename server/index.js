@@ -7,16 +7,48 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+function captureRawBody(req, res, buf) {
+    if (buf && buf.length) {
+        req.rawBody = buf.toString('utf8');
+    }
+}
+
 // ============================================
 // 中间件配置
 // ============================================
 
 // CORS 跨域配置
-app.use(cors());
+const allowedOrigins = [process.env.APP_URL]
+    .filter(Boolean)
+    .map(url => {
+        try {
+            return new URL(url).origin;
+        } catch (error) {
+            return null;
+        }
+    })
+    .filter(Boolean);
+
+app.disable('x-powered-by');
+app.use(cors({
+    origin(origin, callback) {
+        if (!origin) return callback(null, true);
+        if (process.env.NODE_ENV !== 'production') return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error('CORS origin not allowed'));
+    }
+}));
+
+app.use((req, res, next) => {
+    res.setHeader('Referrer-Policy', 'same-origin');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    next();
+});
 
 // 解析 JSON 请求体
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ verify: captureRawBody }));
+app.use(bodyParser.urlencoded({ extended: true, verify: captureRawBody }));
 
 // 静态文件服务（前端页面）
 app.use(express.static(path.join(__dirname, '..', 'public')));

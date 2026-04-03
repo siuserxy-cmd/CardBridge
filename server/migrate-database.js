@@ -5,10 +5,11 @@
  */
 
 const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 require('dotenv').config();
+const { resolveDatabasePath, ensureDatabaseDirectory } = require('./utils/db-path');
 
-const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'database', 'shop.db');
+const dbPath = resolveDatabasePath();
+ensureDatabaseDirectory(dbPath);
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) { console.error('❌ 数据库连接失败:', err.message); process.exit(1); }
     console.log('✅ 连接到数据库');
@@ -28,7 +29,32 @@ function safeRun(sql, desc) {
     });
 }
 
+function dbAll(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
+    });
+}
+
+async function assertRequiredTables() {
+    const requiredTables = ['users', 'products', 'cards', 'orders'];
+    const rows = await dbAll(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (${requiredTables.map(() => '?').join(', ')})`,
+        requiredTables
+    );
+    const existingNames = new Set(rows.map((row) => row.name));
+    const missingTables = requiredTables.filter((tableName) => !existingNames.has(tableName));
+
+    if (missingTables.length > 0) {
+        throw new Error(`数据库尚未初始化，缺少数据表: ${missingTables.join(', ')}。请先运行 npm run init-db`);
+    }
+}
+
 async function migrate() {
+    await assertRequiredTables();
+
     // 1. orders 表：添加 buyer_email（游客购买用）
     await safeRun(
         `ALTER TABLE orders ADD COLUMN buyer_email TEXT`,
@@ -88,6 +114,24 @@ async function migrate() {
     await safeRun(
         `ALTER TABLE orders ADD COLUMN paid_at DATETIME`,
         'orders 表添加 paid_at 字段'
+    );
+
+    // 9.1 orders 表：添加 order_access_token_hash（订单访问令牌哈希）
+    await safeRun(
+        `ALTER TABLE orders ADD COLUMN order_access_token_hash TEXT`,
+        'orders 表添加 order_access_token_hash 字段'
+    );
+
+    // 9.2 orders 表：添加 reservation_expires_at（库存预占过期时间）
+    await safeRun(
+        `ALTER TABLE orders ADD COLUMN reservation_expires_at DATETIME`,
+        'orders 表添加 reservation_expires_at 字段'
+    );
+
+    // 9.3 orders 表：添加 payment_payload（支付页恢复数据）
+    await safeRun(
+        `ALTER TABLE orders ADD COLUMN payment_payload TEXT`,
+        'orders 表添加 payment_payload 字段'
     );
 
     // 10. cards 表：添加 card_type（CDK 类型：月卡/年卡）

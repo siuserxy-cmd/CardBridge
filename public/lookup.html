@@ -199,7 +199,7 @@ async function doLookup(e) {
                 <div class="result-row"><span class="result-label">商品</span><span class="result-value">${esc(data.productName)}</span></div>
                 <div class="result-row"><span class="result-label">数量</span><span class="result-value">${data.quantity} 件</span></div>
                 <div class="result-row"><span class="result-label">金额</span><span class="result-value" style="color:var(--accent);">¥${parseFloat(data.amount).toFixed(2)}</span></div>
-                <div class="result-row"><span class="result-label">状态</span><span class="result-value ${isPaid ? 'paid' : 'pending'}">${isPaid ? '已支付' : data.status === 'confirming' ? '待确认' : '待支付'}</span></div>
+                <div class="result-row"><span class="result-label">状态</span><span class="result-value ${isPaid ? 'paid' : 'pending'}">${isPaid ? '已支付' : data.status === 'confirming' ? '待确认' : data.status === 'expired' ? '已过期' : data.status === 'cancelled' ? '已取消' : '待支付'}</span></div>
                 <div class="result-row"><span class="result-label">下单时间</span><span class="result-value">${data.createdAt ? new Date(data.createdAt).toLocaleString() : '-'}</span></div>
                 ${cardsHtml}
             </div>`;
