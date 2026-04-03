@@ -6,6 +6,16 @@ let currentUser = null;
 let currentProduct = null;
 let isLoginMode = true;
 
+const PRODUCT_CARD_THEMES = [
+    'card-theme-terminal',
+    'card-theme-ocean',
+    'card-theme-ember',
+    'card-theme-cyan',
+    'card-theme-rose',
+    'card-theme-violet',
+    'card-theme-amber'
+];
+
 // ============================================
 // 初始化
 // ============================================
@@ -112,8 +122,11 @@ async function loadProducts() {
             return;
         }
 
-        grid.innerHTML = products.map(product => `
-            <article class="product-card" onclick="location.href='/product.html?id=${product.id}'" style="cursor:pointer;">
+        grid.innerHTML = products.map((product, index) => {
+            const themeClass = getProductCardTheme(product, index);
+
+            return `
+            <article class="product-card ${themeClass}" onclick="location.href='/product.html?id=${product.id}'">
                 <div class="card-content">
                     <div class="card-header">
                         <h3 class="card-title">${escapeHtml(product.name)}</h3>
@@ -145,7 +158,8 @@ async function loadProducts() {
                     </div>
                 </div>
             </article>
-        `).join('');
+        `;
+        }).join('');
     } catch (error) {
         console.error('加载商品失败:', error);
         document.getElementById('productGrid').innerHTML =
@@ -331,6 +345,22 @@ async function viewMyOrders() {
 // ============================================
 // 工具函数
 // ============================================
+function getProductCardTheme(product, index) {
+    const seed = String(product?.id ?? `${index}-${product?.name || 'product'}`);
+    const themeIndex = hashString(seed) % PRODUCT_CARD_THEMES.length;
+    return PRODUCT_CARD_THEMES[themeIndex];
+}
+
+function hashString(value) {
+    let hash = 0;
+
+    for (const char of value) {
+        hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+    }
+
+    return Math.abs(hash);
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;

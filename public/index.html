@@ -449,51 +449,208 @@
         .product-card {
             position: relative;
             padding: 1.8rem;
-            border-radius: 20px;
-            border: 2px solid transparent;
-            transition: 0.25s ease;
+            min-height: 330px;
+            border-radius: 24px;
+            border: 1px solid var(--card-border, rgba(255, 255, 255, 0.12));
+            background: linear-gradient(155deg, var(--card-bg-top, rgba(20, 24, 31, 0.96)) 0%, var(--card-bg-bottom, rgba(9, 11, 14, 0.99)) 100%);
+            box-shadow:
+                inset 0 1px 0 var(--card-highlight, rgba(255, 255, 255, 0.06)),
+                0 22px 54px var(--card-shadow, rgba(0, 0, 0, 0.28));
+            transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease, border-color 0.25s ease;
+            overflow: hidden;
+            isolation: isolate;
+            cursor: pointer;
+        }
+
+        .product-card::before,
+        .product-card::after {
+            content: "";
+            position: absolute;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .product-card::before {
+            inset: -12% 42% auto -12%;
+            height: 240px;
+            background: radial-gradient(circle, var(--card-spot, rgba(255, 255, 255, 0.16)) 0%, transparent 72%);
+            opacity: 0.92;
+        }
+
+        .product-card::after {
+            inset: 0;
+            background:
+                linear-gradient(120deg, transparent 10%, var(--card-sheen, rgba(255, 255, 255, 0.06)) 50%, transparent 90%),
+                linear-gradient(var(--card-grid, rgba(255, 255, 255, 0.03)) 1px, transparent 1px),
+                linear-gradient(90deg, var(--card-grid, rgba(255, 255, 255, 0.03)) 1px, transparent 1px);
+            background-size: auto, 100% 30px, 30px 100%;
+            background-position: center;
+            opacity: var(--card-pattern-opacity, 0.72);
+            mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.28));
         }
 
         .product-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
-            filter: brightness(1.08);
+            transform: translateY(-6px);
+            border-color: var(--card-border-strong, var(--card-border, rgba(255, 255, 255, 0.18)));
+            box-shadow:
+                inset 0 1px 0 var(--card-highlight, rgba(255, 255, 255, 0.08)),
+                0 28px 64px var(--card-shadow-hover, rgba(0, 0, 0, 0.36));
+            filter: brightness(1.04);
         }
 
-        .product-card:nth-child(1) {
-            background: #1e1535;
-            border-color: #7c3aed;
+        .product-card.card-theme-terminal {
+            --card-bg-top: rgba(29, 38, 21, 0.98);
+            --card-bg-bottom: rgba(10, 14, 9, 0.99);
+            --card-border: rgba(199, 255, 107, 0.22);
+            --card-border-strong: rgba(199, 255, 107, 0.36);
+            --card-highlight: rgba(233, 255, 204, 0.12);
+            --card-shadow: rgba(76, 107, 24, 0.18);
+            --card-shadow-hover: rgba(76, 107, 24, 0.3);
+            --card-spot: rgba(199, 255, 107, 0.28);
+            --card-sheen: rgba(199, 255, 107, 0.08);
+            --card-grid: rgba(199, 255, 107, 0.05);
+            --card-accent: #d7ff7d;
+            --card-accent-bg: rgba(199, 255, 107, 0.12);
+            --card-accent-bg-hover: rgba(199, 255, 107, 0.18);
+            --card-accent-border: rgba(199, 255, 107, 0.28);
+            --card-accent-soft: rgba(199, 255, 107, 0.13);
+            --card-stat-bg: rgba(199, 255, 107, 0.05);
+            --card-stat-border: rgba(199, 255, 107, 0.12);
+            --card-stock: #ffe587;
         }
 
-        .product-card:nth-child(2) {
-            background: #0f1d35;
-            border-color: #2563eb;
+        .product-card.card-theme-ocean {
+            --card-bg-top: rgba(14, 27, 41, 0.98);
+            --card-bg-bottom: rgba(8, 13, 22, 0.99);
+            --card-border: rgba(96, 165, 250, 0.24);
+            --card-border-strong: rgba(96, 165, 250, 0.38);
+            --card-highlight: rgba(198, 228, 255, 0.1);
+            --card-shadow: rgba(33, 92, 156, 0.18);
+            --card-shadow-hover: rgba(33, 92, 156, 0.3);
+            --card-spot: rgba(96, 165, 250, 0.28);
+            --card-sheen: rgba(96, 165, 250, 0.08);
+            --card-grid: rgba(96, 165, 250, 0.05);
+            --card-accent: #8ec5ff;
+            --card-accent-bg: rgba(96, 165, 250, 0.13);
+            --card-accent-bg-hover: rgba(96, 165, 250, 0.2);
+            --card-accent-border: rgba(96, 165, 250, 0.28);
+            --card-accent-soft: rgba(96, 165, 250, 0.15);
+            --card-stat-bg: rgba(96, 165, 250, 0.05);
+            --card-stat-border: rgba(96, 165, 250, 0.12);
+            --card-stock: #7ee7ff;
         }
 
-        .product-card:nth-child(3) {
-            background: #0b2420;
-            border-color: #059669;
+        .product-card.card-theme-ember {
+            --card-bg-top: rgba(45, 23, 17, 0.98);
+            --card-bg-bottom: rgba(18, 10, 8, 0.99);
+            --card-border: rgba(251, 146, 60, 0.24);
+            --card-border-strong: rgba(251, 146, 60, 0.38);
+            --card-highlight: rgba(255, 224, 201, 0.1);
+            --card-shadow: rgba(147, 64, 17, 0.2);
+            --card-shadow-hover: rgba(147, 64, 17, 0.32);
+            --card-spot: rgba(251, 146, 60, 0.3);
+            --card-sheen: rgba(251, 146, 60, 0.08);
+            --card-grid: rgba(251, 146, 60, 0.05);
+            --card-accent: #ffb36a;
+            --card-accent-bg: rgba(251, 146, 60, 0.14);
+            --card-accent-bg-hover: rgba(251, 146, 60, 0.22);
+            --card-accent-border: rgba(251, 146, 60, 0.28);
+            --card-accent-soft: rgba(251, 146, 60, 0.15);
+            --card-stat-bg: rgba(251, 146, 60, 0.05);
+            --card-stat-border: rgba(251, 146, 60, 0.12);
+            --card-stock: #ffd37f;
         }
 
-        .product-card:nth-child(4) {
-            background: #271a0a;
-            border-color: #d97706;
+        .product-card.card-theme-cyan {
+            --card-bg-top: rgba(9, 33, 35, 0.98);
+            --card-bg-bottom: rgba(5, 15, 18, 0.99);
+            --card-border: rgba(45, 212, 191, 0.24);
+            --card-border-strong: rgba(45, 212, 191, 0.38);
+            --card-highlight: rgba(204, 255, 249, 0.1);
+            --card-shadow: rgba(18, 110, 108, 0.2);
+            --card-shadow-hover: rgba(18, 110, 108, 0.32);
+            --card-spot: rgba(45, 212, 191, 0.28);
+            --card-sheen: rgba(45, 212, 191, 0.08);
+            --card-grid: rgba(45, 212, 191, 0.05);
+            --card-accent: #75f7e1;
+            --card-accent-bg: rgba(45, 212, 191, 0.13);
+            --card-accent-bg-hover: rgba(45, 212, 191, 0.2);
+            --card-accent-border: rgba(45, 212, 191, 0.28);
+            --card-accent-soft: rgba(45, 212, 191, 0.15);
+            --card-stat-bg: rgba(45, 212, 191, 0.05);
+            --card-stat-border: rgba(45, 212, 191, 0.12);
+            --card-stock: #b2fff1;
         }
 
-        .product-card:nth-child(5) {
-            background: #2a0f20;
-            border-color: #db2777;
+        .product-card.card-theme-rose {
+            --card-bg-top: rgba(41, 15, 31, 0.98);
+            --card-bg-bottom: rgba(16, 8, 15, 0.99);
+            --card-border: rgba(244, 114, 182, 0.24);
+            --card-border-strong: rgba(244, 114, 182, 0.38);
+            --card-highlight: rgba(255, 219, 239, 0.1);
+            --card-shadow: rgba(132, 42, 88, 0.2);
+            --card-shadow-hover: rgba(132, 42, 88, 0.32);
+            --card-spot: rgba(244, 114, 182, 0.28);
+            --card-sheen: rgba(244, 114, 182, 0.08);
+            --card-grid: rgba(244, 114, 182, 0.05);
+            --card-accent: #ff9ad0;
+            --card-accent-bg: rgba(244, 114, 182, 0.13);
+            --card-accent-bg-hover: rgba(244, 114, 182, 0.2);
+            --card-accent-border: rgba(244, 114, 182, 0.28);
+            --card-accent-soft: rgba(244, 114, 182, 0.15);
+            --card-stat-bg: rgba(244, 114, 182, 0.05);
+            --card-stat-border: rgba(244, 114, 182, 0.12);
+            --card-stock: #ffd1a8;
         }
 
-        .product-card:nth-child(n+6) {
-            background: #0c1f2e;
-            border-color: #0891b2;
+        .product-card.card-theme-violet {
+            --card-bg-top: rgba(27, 20, 47, 0.98);
+            --card-bg-bottom: rgba(12, 9, 21, 0.99);
+            --card-border: rgba(167, 139, 250, 0.24);
+            --card-border-strong: rgba(167, 139, 250, 0.38);
+            --card-highlight: rgba(226, 218, 255, 0.1);
+            --card-shadow: rgba(76, 53, 141, 0.2);
+            --card-shadow-hover: rgba(76, 53, 141, 0.32);
+            --card-spot: rgba(167, 139, 250, 0.28);
+            --card-sheen: rgba(167, 139, 250, 0.08);
+            --card-grid: rgba(167, 139, 250, 0.05);
+            --card-accent: #cab8ff;
+            --card-accent-bg: rgba(167, 139, 250, 0.13);
+            --card-accent-bg-hover: rgba(167, 139, 250, 0.2);
+            --card-accent-border: rgba(167, 139, 250, 0.28);
+            --card-accent-soft: rgba(167, 139, 250, 0.15);
+            --card-stat-bg: rgba(167, 139, 250, 0.05);
+            --card-stat-border: rgba(167, 139, 250, 0.12);
+            --card-stock: #ffd59a;
+        }
+
+        .product-card.card-theme-amber {
+            --card-bg-top: rgba(41, 28, 9, 0.98);
+            --card-bg-bottom: rgba(16, 11, 5, 0.99);
+            --card-border: rgba(250, 204, 21, 0.24);
+            --card-border-strong: rgba(250, 204, 21, 0.38);
+            --card-highlight: rgba(255, 240, 193, 0.1);
+            --card-shadow: rgba(132, 95, 16, 0.2);
+            --card-shadow-hover: rgba(132, 95, 16, 0.32);
+            --card-spot: rgba(250, 204, 21, 0.28);
+            --card-sheen: rgba(250, 204, 21, 0.08);
+            --card-grid: rgba(250, 204, 21, 0.05);
+            --card-accent: #ffe16a;
+            --card-accent-bg: rgba(250, 204, 21, 0.13);
+            --card-accent-bg-hover: rgba(250, 204, 21, 0.2);
+            --card-accent-border: rgba(250, 204, 21, 0.28);
+            --card-accent-soft: rgba(250, 204, 21, 0.15);
+            --card-stat-bg: rgba(250, 204, 21, 0.05);
+            --card-stat-border: rgba(250, 204, 21, 0.12);
+            --card-stock: #fff0a6;
         }
 
         .card-content {
             height: 100%;
             display: flex;
             flex-direction: column;
+            position: relative;
+            z-index: 1;
         }
 
         .card-header {
@@ -524,9 +681,9 @@
         }
 
         .status-badge.in_stock {
-            color: var(--success);
-            background: rgba(121, 242, 170, 0.1);
-            border-color: rgba(121, 242, 170, 0.16);
+            color: var(--card-accent, var(--success));
+            background: var(--card-accent-soft, rgba(121, 242, 170, 0.1));
+            border-color: var(--card-accent-border, rgba(121, 242, 170, 0.16));
         }
 
         .status-badge.out_of_stock {
@@ -558,9 +715,11 @@
         .card-stat {
             padding: 0.7rem 0.65rem;
             border-radius: 14px;
-            border: 1px solid var(--line);
+            border: 1px solid var(--card-stat-border, var(--line));
             background: rgba(255, 255, 255, 0.02);
+            background: var(--card-stat-bg, rgba(255, 255, 255, 0.02));
             text-align: center;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
         }
 
         .card-stat-label {
@@ -577,9 +736,9 @@
             line-height: 1;
         }
 
-        .card-stat-value.price { color: var(--accent); }
+        .card-stat-value.price { color: var(--card-accent, var(--accent)); }
         .card-stat-value.sold { color: var(--text); }
-        .card-stat-value.stock { color: #ffd86a; }
+        .card-stat-value.stock { color: var(--card-stock, #ffd86a); }
 
         .card-footer {
             margin-top: auto;
@@ -591,16 +750,17 @@
             min-height: 2.85rem;
             padding: 0.75rem 1rem;
             border-radius: 999px;
-            border: 1px solid rgba(199, 255, 107, 0.18);
-            background: rgba(199, 255, 107, 0.1);
-            color: var(--accent);
+            border: 1px solid var(--card-accent-border, rgba(199, 255, 107, 0.18));
+            background: var(--card-accent-bg, rgba(199, 255, 107, 0.1));
+            color: var(--card-accent, var(--accent));
             cursor: pointer;
             transition: 0.22s ease;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
 
         .btn-buy:hover:not(:disabled) {
             transform: translateY(-1px);
-            background: rgba(199, 255, 107, 0.16);
+            background: var(--card-accent-bg-hover, rgba(199, 255, 107, 0.16));
         }
 
         .btn-buy:disabled {
