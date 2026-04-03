@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadProducts();
     loadOrders();
     loadCDKList();
+    populateCDKProductSelect();
     setupEventListeners();
 });
 
@@ -152,6 +153,9 @@ async function loadOrders() {
                     break;
                 case 'cancelled':
                     statusBadge = '<span class="badge badge-danger">已取消</span>';
+                    break;
+                case 'expired':
+                    statusBadge = '<span class="badge badge-danger">已过期</span>';
                     break;
                 default:
                     statusBadge = '<span class="badge badge-warning">待支付</span>';
@@ -427,13 +431,19 @@ function toggleCDK(id) {
 
 async function populateCDKProductSelect() {
     const select = document.getElementById('cdkImportProduct');
-    if (!select || select.options.length > 1) return;
+    if (!select) return;
     try {
         const token = localStorage.getItem('token');
         const res = await fetch(`${API_BASE}/products`, { headers: { 'Authorization': `Bearer ${token}` } });
         const products = await res.json();
+        if (!products.length) {
+            select.innerHTML = '<option value="">暂无商品，请先添加</option>';
+            return;
+        }
         select.innerHTML = products.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
-    } catch (e) {}
+    } catch (e) {
+        console.error('加载商品下拉失败:', e);
+    }
 }
 
 async function importCDK() {
