@@ -485,38 +485,25 @@ async function init() {
     }
 }
 
+let activeMethod = 'wechat'; // current display method
+
 function renderPayment() {
     expireTime = Date.now() + 30 * 60 * 1000; // 30 minutes
     const isManual = orderData.manualMode;
     const payUrl = orderData.payUrl || orderData.codeUrl || '';
-    const qrImage = orderData.qrImage || '';
     const contactInfo = orderData.contactInfo || '';
-    const method = orderData.paymentMethod || '';
-    const methodLabel = method === 'wechat' ? '微信' : method === 'alipay' ? '支付宝' : '';
 
-    // Determine QR area content
-    let qrHtml, hintText, actionHtml;
-
-    if (isManual) {
-        // Manual mode: show personal payment QR image
-        qrHtml = `<img src="${escHtml(qrImage)}" alt="${methodLabel}收款码" style="width:100%;height:auto;">`;
-        hintText = `请使用${methodLabel}扫码转账 <strong style="color:var(--accent);">¥${parseFloat(orderData.amount || 0).toFixed(2)}</strong>`;
-        actionHtml = `
-            <button class="btn-test-pay" id="btnMarkPaid" onclick="markPaid()" style="margin-top:1.2rem;font-size:0.95rem;padding:0.75rem 1.8rem;">
-                我已支付
-            </button>
-            ${contactInfo ? `<p style="margin-top:0.8rem;color:var(--text-dim);font-size:0.78rem;">${escHtml(contactInfo)}</p>` : ''}
-        `;
-    } else if (payUrl) {
-        // SDK mode: generate dynamic QR
-        qrHtml = '<canvas id="qrCanvas"></canvas>';
-        hintText = `请使用${methodLabel || '微信或支付宝'}扫码支付`;
-        actionHtml = '';
-    } else {
-        qrHtml = '<div style="padding:2rem;color:#333;font-size:0.88rem;">暂无收款码</div>';
-        hintText = '请联系客服完成支付';
-        actionHtml = contactInfo ? `<p style="margin-top:0.8rem;color:var(--text-soft);font-size:0.88rem;">${escHtml(contactInfo)}</p>` : '';
+    function getQrForMethod(method) {
+        if (!isManual) return { qrHtml: payUrl ? '<canvas id="qrCanvas"></canvas>' : '<div style="padding:2rem;color:#333;font-size:0.88rem;">暂无收款码</div>', hint: '请扫码支付' };
+        const qrImg = method === 'alipay' ? '/images/alipay-pay.svg' : '/images/wechat-pay.svg';
+        const label = method === 'alipay' ? '支付宝' : '微信';
+        return {
+            qrHtml: `<img src="${qrImg}" alt="${label}收款码" style="width:100%;height:auto;">`,
+            hint: `请使用${label}扫码转账 <strong style="color:var(--accent);">¥${parseFloat(orderData.amount || 0).toFixed(2)}</strong>`
+        };
     }
+
+    const qr = getQrForMethod(activeMethod);
 
     document.getElementById('app').innerHTML = `
         <!-- Steps bar: step 2 active -->
@@ -558,10 +545,27 @@ function renderPayment() {
                     <span class="order-info-value amount">¥${parseFloat(orderData.amount || 0).toFixed(2)}</span>
                 </div>
 
-                <div class="qr-area" id="qrArea">${qrHtml}</div>
-                <p class="qr-hint">${hintText}</p>
+                <!-- Payment method tabs -->
+                ${isManual ? `
+                <div style="display:flex;gap:0.5rem;justify-content:center;margin-bottom:1.2rem;">
+                    <button onclick="switchMethod('wechat')" id="tabWechat" style="padding:0.6rem 1.2rem;border-radius:999px;border:1px solid ${activeMethod==='wechat'?'var(--success)':'var(--line)'};background:${activeMethod==='wechat'?'rgba(121,242,170,0.12)':'rgba(255,255,255,0.04)'};color:${activeMethod==='wechat'?'var(--success)':'var(--text-soft)'};cursor:pointer;font:inherit;font-size:0.88rem;transition:0.2s;">
+                        微信支付
+                    </button>
+                    <button onclick="switchMethod('alipay')" id="tabAlipay" style="padding:0.6rem 1.2rem;border-radius:999px;border:1px solid ${activeMethod==='alipay'?'#1677ff':'var(--line)'};background:${activeMethod==='alipay'?'rgba(22,119,255,0.12)':'rgba(255,255,255,0.04)'};color:${activeMethod==='alipay'?'#5ba0ff':'var(--text-soft)'};cursor:pointer;font:inherit;font-size:0.88rem;transition:0.2s;">
+                        支付宝
+                    </button>
+                </div>
+                ` : ''}
 
-                ${actionHtml}
+                <div class="qr-area" id="qrArea">${qr.qrHtml}</div>
+                <p class="qr-hint" id="qrHint">${qr.hint}</p>
+
+                ${isManual ? `
+                <button class="btn-test-pay" id="btnMarkPaid" onclick="markPaid()" style="margin-top:1.2rem;font-size:0.95rem;padding:0.75rem 1.8rem;">
+                    我已支付
+                </button>
+                ${contactInfo ? `<p style="margin-top:0.8rem;color:var(--text-dim);font-size:0.78rem;">${escHtml(contactInfo)}</p>` : ''}
+                ` : ''}
 
                 <div style="margin-top:1.2rem;">
                     <div class="timer-bar" id="timerBar">
@@ -586,6 +590,13 @@ function renderPayment() {
         }
     }
 
+    startTimer();
+    startPolling();
+}
+
+function switchMethod(method) {
+    activeMethod = method;
+    renderPayment();
     startTimer();
     startPolling();
 }
@@ -681,9 +692,9 @@ function startPolling() {
             if (!res.ok) return;
             const data = await res.json();
             if (data.status === 'paid') {
-                // Merge deliveryType from order data
-                if (orderData) data.deliveryType = data.deliveryType || orderData.deliveryType;
-                renderSuccess(data);
+                stopTimers();
+                window.location.href = `/order/${orderNo}`;
+                return;
             } else if (data.status === 'confirming') {
                 const msg = document.getElementById('statusMsg');
                 if (msg) msg.innerHTML = '<span style="color:var(--warn);">已提交，等待卖家确认收款...</span>';

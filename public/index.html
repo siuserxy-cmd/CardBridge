@@ -828,6 +828,7 @@
             </div>
             <nav class="header-nav">
                 <a href="#products" class="nav-link">浏览商品</a>
+                <a href="/lookup" class="nav-link">订单查询</a>
                 <a class="nav-link nav-cta" id="userMenuBtn">登录 / 注册</a>
             </nav>
         </div>
@@ -1001,9 +1002,27 @@
         </div>
     </div>
 
-    <footer class="footer">
-        <p>&copy; 2025 数字商店</p>
-        <p>Terminal-inspired layout / 自动发货 / 安全可靠的数字商品交易平台</p>
+    <footer class="footer" style="display:block;text-align:left;">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-bottom:1.5rem;">
+            <div>
+                <div style="color:var(--text-soft);font-size:0.82rem;font-weight:700;margin-bottom:0.6rem;text-transform:uppercase;letter-spacing:0.08em;">关于我们</div>
+                <p style="font-size:0.78rem;line-height:1.8;">提供优质的数字商品，自动发货，安全可靠。支持支付宝和微信支付。</p>
+            </div>
+            <div>
+                <div style="color:var(--text-soft);font-size:0.82rem;font-weight:700;margin-bottom:0.6rem;text-transform:uppercase;letter-spacing:0.08em;">帮助中心</div>
+                <div style="font-size:0.78rem;line-height:2.2;">
+                    <a href="/lookup" style="display:block;color:var(--text-dim);transition:0.2s;">订单查询</a>
+                    <a href="#products" style="display:block;color:var(--text-dim);transition:0.2s;">购买流程</a>
+                </div>
+            </div>
+            <div>
+                <div style="color:var(--text-soft);font-size:0.82rem;font-weight:700;margin-bottom:0.6rem;text-transform:uppercase;letter-spacing:0.08em;">联系方式</div>
+                <p style="font-size:0.78rem;line-height:1.8;">如有问题请联系客服处理</p>
+            </div>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:1rem;text-align:center;">
+            <p>&copy; 2025 数字商店 - 保留所有权利</p>
+        </div>
     </footer>
 
     <script src="/js/main.js?v=20260401"></script>

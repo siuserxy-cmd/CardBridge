@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单详情 - 数字商店</title>
+    <style>
+        :root {
+            --bg: #0b0d10;
+            --panel: rgba(17, 21, 27, 0.94);
+            --line: rgba(180, 192, 205, 0.14);
+            --line-strong: rgba(220, 231, 243, 0.22);
+            --text: #eef4fb;
+            --text-soft: #b6c2cf;
+            --text-dim: #728092;
+            --accent: #c7ff6b;
+            --success: #79f2aa;
+            --danger: #ff857f;
+            --warn: #ffd86a;
+            --shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+            --radius: 26px;
+            --radius-sm: 18px;
+            --max-width: 720px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(199, 255, 107, 0.07), transparent 26%),
+                radial-gradient(circle at 85% 14%, rgba(125, 211, 252, 0.07), transparent 24%),
+                linear-gradient(180deg, #090b0e 0%, #0d1014 45%, #090b0e 100%);
+            color: var(--text);
+            font-family: "SFMono-Regular", "JetBrains Mono", "IBM Plex Mono", "Fira Code", "Menlo", monospace;
+            line-height: 1.7;
+        }
+        a { color: inherit; text-decoration: none; }
+        .site-header {
+            position: sticky; top: 0; z-index: 100;
+            backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+            background: rgba(9, 11, 14, 0.72);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .site-header-inner {
+            width: min(calc(100% - 32px), var(--max-width));
+            margin: 0 auto; min-height: 76px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .back-link {
+            display: inline-flex; align-items: center; gap: 0.6rem;
+            color: var(--text-soft); font-size: 0.82rem;
+            padding: 0.7rem 0.95rem; border-radius: 999px;
+            border: 1px solid transparent; transition: 0.22s ease;
+        }
+        .back-link:hover { color: var(--text); border-color: var(--line); background: rgba(255,255,255,0.03); }
+        .logo { display: flex; align-items: center; gap: 0.8rem; }
+        .logo-mark {
+            width: 2.2rem; height: 2.2rem; border-radius: 14px;
+            display: grid; place-items: center;
+            border: 1px solid var(--line-strong);
+            background: linear-gradient(180deg, rgba(199,255,107,0.16), rgba(199,255,107,0.04));
+            color: var(--accent);
+        }
+        .logo-text { font-size: 0.94rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; }
+        .page-shell { width: min(calc(100% - 32px), var(--max-width)); margin: 0 auto; padding: 2.4rem 0 4rem; }
+        .steps-bar {
+            display: flex; align-items: center; justify-content: center; gap: 0;
+            margin-bottom: 1.75rem; padding: 1.2rem 1.5rem;
+            border-radius: var(--radius); border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(18,22,28,0.95), rgba(10,13,18,0.98));
+        }
+        .step-item { display: flex; align-items: center; gap: 0.55rem; }
+        .step-circle {
+            width: 2rem; height: 2rem; border-radius: 999px;
+            display: grid; place-items: center; font-size: 0.82rem; font-weight: 700;
+            border: 2px solid var(--line); color: var(--text-dim); background: transparent; flex-shrink: 0;
+        }
+        .step-circle.done { border-color: var(--success); background: rgba(121,242,170,0.15); color: var(--success); }
+        .step-label { font-size: 0.82rem; color: var(--text-dim); white-space: nowrap; }
+        .step-label.done { color: var(--success); }
+        .step-line { width: 3.5rem; height: 2px; background: var(--line); margin: 0 0.6rem; flex-shrink: 0; }
+        .step-line.done { background: var(--success); }
+        .terminal-window {
+            border-radius: var(--radius); border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(18,22,28,0.95), rgba(10,13,18,0.98));
+            box-shadow: var(--shadow); overflow: hidden;
+        }
+        .window-bar {
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+            padding: 0.95rem 1.2rem; border-bottom: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.02);
+        }
+        .window-controls { display: flex; gap: 0.4rem; }
+        .window-dot { width: 0.68rem; height: 0.68rem; border-radius: 999px; }
+        .window-dot:nth-child(1) { background: #ff6e68; }
+        .window-dot:nth-child(2) { background: #ffd86a; }
+        .window-dot:nth-child(3) { background: #68f29a; }
+        .window-title { color: var(--text-dim); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .success-panel { padding: 2.5rem 1.5rem; text-align: center; }
+        .success-icon {
+            width: 3.5rem; height: 3.5rem; margin: 0 auto 1rem;
+            border-radius: 999px; background: rgba(121,242,170,0.15);
+            border: 2px solid var(--success); display: grid; place-items: center;
+            color: var(--success); font-size: 1.5rem;
+        }
+        .success-title { font-size: 1.3rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; }
+        .success-sub { color: var(--text-soft); font-size: 0.88rem; margin-bottom: 1.5rem; }
+        .order-info {
+            display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1.2rem;
+            text-align: left; max-width: 420px; margin: 0 auto 1.5rem;
+            padding: 1.1rem 1.3rem; border-radius: var(--radius-sm);
+            border: 1px solid var(--line); background: rgba(255,255,255,0.02);
+        }
+        .order-info-label { color: var(--text-dim); font-size: 0.82rem; }
+        .order-info-value { color: var(--text); font-size: 0.88rem; font-weight: 600; text-align: right; }
+        .order-info-value.amount { color: var(--accent); font-size: 1.1rem; }
+        .cards-section { text-align: left; max-width: 420px; margin: 0 auto 1.5rem; }
+        .cards-title { color: var(--accent); font-size: 0.88rem; font-weight: 700; margin-bottom: 0.75rem; }
+        .card-item {
+            padding: 1rem; margin-bottom: 0.6rem; border-radius: 14px;
+            border: 1px solid rgba(199,255,107,0.15); background: rgba(199,255,107,0.05);
+        }
+        .card-label { color: var(--text-dim); font-size: 0.72rem; margin-bottom: 0.3rem; }
+        .card-value {
+            font-family: monospace; font-size: 0.95rem; color: var(--accent);
+            word-break: break-all; user-select: all; cursor: text;
+        }
+        .btn-home {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.75rem 1.5rem; border-radius: 999px;
+            border: 1px solid rgba(199,255,107,0.18); background: rgba(199,255,107,0.12);
+            color: var(--accent); cursor: pointer; transition: 0.22s ease; font: inherit;
+        }
+        .btn-home:hover { transform: translateY(-1px); background: rgba(199,255,107,0.18); }
+        .btn-lookup {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.75rem 1.5rem; border-radius: 999px;
+            border: 1px solid var(--line); background: rgba(255,255,255,0.04);
+            color: var(--text-soft); cursor: pointer; transition: 0.22s ease; font: inherit;
+            margin-left: 0.5rem;
+        }
+        .btn-lookup:hover { transform: translateY(-1px); border-color: var(--line-strong); }
+        .pending-panel { padding: 2.5rem 1.5rem; text-align: center; }
+        .pending-icon {
+            width: 3.5rem; height: 3.5rem; margin: 0 auto 1rem;
+            border-radius: 999px; background: rgba(255,216,106,0.15);
+            border: 2px solid var(--warn); display: grid; place-items: center;
+            color: var(--warn); font-size: 1.5rem;
+        }
+        .loading-state { padding: 4rem 1.5rem; text-align: center; color: var(--text-dim); }
+        .loading-spinner {
+            width: 42px; height: 42px; margin: 0 auto 1rem; border-radius: 999px;
+            border: 3px solid rgba(199,255,107,0.12); border-top-color: var(--accent);
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .info-tip {
+            margin-top: 1.2rem; padding: 0.95rem 1rem; border-radius: 18px;
+            border: 1px solid rgba(255,216,106,0.12); background: rgba(255,216,106,0.08);
+            color: var(--text-soft); font-size: 0.82rem;
+            display: flex; gap: 0.65rem; align-items: flex-start;
+            max-width: 420px; margin-left: auto; margin-right: auto;
+        }
+        .info-tip span { color: var(--warn); flex-shrink: 0; }
+        @media (max-width: 720px) {
+            .site-header-inner { min-height: 68px; }
+            .success-panel, .pending-panel { padding: 1.5rem 1rem; }
+            .order-info { grid-template-columns: 1fr; gap: 0.3rem 0; }
+            .order-info-value { text-align: left; }
+        }
+    </style>
+</head>
+<body>
+<header class="site-header">
+    <div class="site-header-inner">
+        <a href="/" class="back-link">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+            返回首页
+        </a>
+        <a href="/" class="logo">
+            <span class="logo-mark">></span>
+            <span class="logo-text">数字商店</span>
+        </a>
+    </div>
+</header>
+
+<div class="page-shell" id="app">
+    <div class="terminal-window">
+        <div class="window-bar">
+            <div class="window-controls"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+            <div class="window-title">order-loader</div>
+        </div>
+        <div class="loading-state"><div class="loading-spinner"></div><div>加载订单信息...</div></div>
+    </div>
+</div>
+
+<script>
+const API = window.location.origin + '/api';
+const orderNo = location.pathname.split('/order/')[1]?.replace(/\/$/, '') || '';
+
+async function loadOrder() {
+    if (!orderNo) { showError('缺少订单号'); return; }
+
+    try {
+        const res = await fetch(`${API}/orders/detail/${orderNo}`);
+        if (!res.ok) throw new Error('订单不存在');
+        const data = await res.json();
+        render(data);
+    } catch (e) {
+        showError(e.message || '加载失败');
+    }
+}
+
+function render(d) {
+    const isPaid = d.status === 'paid';
+    const isRecharge = d.deliveryType === 'auto_recharge';
+
+    let stepsHtml = `
+        <div class="steps-bar">
+            <div class="step-item"><div class="step-circle done">&#10003;</div><span class="step-label done">创建订单</span></div>
+            <div class="step-line done"></div>
+            <div class="step-item"><div class="step-circle done">&#10003;</div><span class="step-label done">扫码支付</span></div>
+            <div class="step-line ${isPaid ? 'done' : ''}"></div>
+            <div class="step-item"><div class="step-circle ${isPaid ? 'done' : ''}">${isPaid ? '&#10003;' : '3'}</div>
+                <span class="step-label ${isPaid ? 'done' : ''}">${isRecharge ? '自动充值' : '获取卡密'}</span></div>
+        </div>`;
+
+    let orderInfoHtml = `
+        <div class="order-info">
+            <span class="order-info-label">订单号:</span><span class="order-info-value">${d.orderNo}</span>
+            <span class="order-info-label">商品:</span><span class="order-info-value">${esc(d.productName)}</span>
+            <span class="order-info-label">数量:</span><span class="order-info-value">${d.quantity} 件</span>
+            <span class="order-info-label">金额:</span><span class="order-info-value amount">¥${parseFloat(d.amount).toFixed(2)}</span>
+            <span class="order-info-label">状态:</span><span class="order-info-value" style="color:${isPaid ? 'var(--success)' : 'var(--warn)'};">${isPaid ? '已支付' : '待支付'}</span>
+        </div>`;
+
+    if (isPaid && d.cards && d.cards.length > 0 && !isRecharge) {
+        const cardsHtml = d.cards.map((c, i) => `
+            <div class="card-item">
+                <div class="card-label">第 ${i + 1} 张</div>
+                ${c.card_number ? `<div class="card-value">${esc(c.card_number)}</div>` : ''}
+                ${c.card_password ? `<div style="margin-top:0.3rem;"><span class="card-label">密码: </span><span class="card-value">${esc(c.card_password)}</span></div>` : ''}
+            </div>
+        `).join('');
+
+        document.getElementById('app').innerHTML = `
+            ${stepsHtml}
+            <div class="terminal-window">
+                <div class="window-bar">
+                    <div class="window-controls"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+                    <div class="window-title">order-complete</div>
+                </div>
+                <div class="success-panel">
+                    <div class="success-icon">&#10003;</div>
+                    <div class="success-title">支付成功！</div>
+                    <p class="success-sub">卡密已发送到您的邮箱，也可以直接在下方查看。</p>
+                    ${orderInfoHtml}
+                    <div class="cards-section">
+                        <div class="cards-title">您的卡密内容</div>
+                        ${cardsHtml}
+                    </div>
+                    <div class="info-tip"><span>!</span><div>请妥善保存卡密，勿泄露给他人。如有问题请保留此页面作为凭证。</div></div>
+                    <div style="margin-top:1.5rem;">
+                        <button class="btn-home" onclick="location.href='/'">返回首页</button>
+                        <button class="btn-lookup" onclick="location.href='/lookup'">查询订单</button>
+                    </div>
+                </div>
+            </div>`;
+    } else if (isPaid && isRecharge) {
+        const statusMsg = d.rechargeStatus === 'success' ? '充值成功！请查看你的 ChatGPT 账号。'
+            : d.rechargeStatus === 'failed' ? '充值失败，请联系客服处理。'
+            : '充值处理中，请稍候...';
+        document.getElementById('app').innerHTML = `
+            ${stepsHtml}
+            <div class="terminal-window">
+                <div class="window-bar">
+                    <div class="window-controls"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+                    <div class="window-title">recharge-status</div>
+                </div>
+                <div class="success-panel">
+                    <div class="success-icon">&#10003;</div>
+                    <div class="success-title">支付成功！</div>
+                    <p class="success-sub">${statusMsg}</p>
+                    ${orderInfoHtml}
+                    <div style="margin-top:1.5rem;">
+                        <button class="btn-home" onclick="location.href='/'">返回首页</button>
+                    </div>
+                </div>
+            </div>`;
+    } else {
+        document.getElementById('app').innerHTML = `
+            ${stepsHtml}
+            <div class="terminal-window">
+                <div class="window-bar">
+                    <div class="window-controls"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+                    <div class="window-title">order-pending</div>
+                </div>
+                <div class="pending-panel">
+                    <div class="pending-icon">!</div>
+                    <div style="font-size:1.2rem;font-weight:700;color:var(--warn);margin-bottom:0.5rem;">订单待支付</div>
+                    <p class="success-sub">请完成支付后再查看卡密。</p>
+                    ${orderInfoHtml}
+                    <div style="margin-top:1.5rem;">
+                        <button class="btn-home" onclick="location.href='/payment/${d.orderNo}'">去支付</button>
+                        <button class="btn-lookup" onclick="location.href='/'">返回首页</button>
+                    </div>
+                </div>
+            </div>`;
+    }
+}
+
+function showError(msg) {
+    document.getElementById('app').innerHTML = `
+        <div class="terminal-window">
+            <div class="window-bar">
+                <div class="window-controls"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+                <div class="window-title">error.log</div>
+            </div>
+            <div class="loading-state">
+                <div style="font-size:2.2rem;margin-bottom:0.8rem;">!</div>
+                <div style="color:var(--text);font-size:1rem;margin-bottom:0.5rem;">${esc(msg)}</div>
+                <a href="/" style="color:var(--accent);">返回首页</a>
+            </div>
+        </div>`;
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+loadOrder();
+</script>
+</body>
+</html>
