@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupEventListeners() {
     document.getElementById('addProductForm').addEventListener('submit', handleAddProduct);
     document.getElementById('addCardsForm').addEventListener('submit', handleAddCards);
+    document.getElementById('editProductForm')?.addEventListener('submit', handleEditProduct);
 }
 
 // 检查管理员权限
@@ -112,6 +113,7 @@ async function loadProducts() {
                 <td>${deliveryLabel}</td>
                 <td><span class="badge ${p.status === 'in_stock' ? 'badge-success' : 'badge-danger'}">${p.status === 'in_stock' ? '有货' : '售罄'}</span></td>
                 <td>
+                    <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: #2563eb;" onclick="openEditProductModal(${p.id}, '${escapeHtml(p.name).replace(/'/g, "\\'")}', '${escapeHtml(p.description || '').replace(/'/g, "\\'")}', ${p.price}, '${p.delivery_type || 'email'}')">编辑</button>
                     <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;" onclick="openAddCardsModal(${p.id})">添加卡密</button>
                     <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem; background: #dc2626;" onclick="deleteProduct(${p.id})">删除</button>
                 </td>
@@ -221,6 +223,55 @@ async function handleAddProduct(e) {
     } catch (error) {
         console.error('添加商品失败:', error);
         alert('添加失败，请稍后重试');
+    }
+}
+
+// 编辑商品
+function openEditProductModal(id, name, description, price, deliveryType) {
+    document.getElementById('editProductId').value = id;
+    document.getElementById('editProductName').value = name;
+    document.getElementById('editProductDescription').value = description;
+    document.getElementById('editProductPrice').value = price;
+    document.getElementById('editProductDeliveryType').value = deliveryType;
+    document.getElementById('editProductModal').classList.add('active');
+}
+
+function closeEditProductModal() {
+    document.getElementById('editProductModal').classList.remove('active');
+}
+
+async function handleEditProduct(e) {
+    e.preventDefault();
+
+    const id = document.getElementById('editProductId').value;
+    const name = document.getElementById('editProductName').value;
+    const description = document.getElementById('editProductDescription').value;
+    const price = parseFloat(document.getElementById('editProductPrice').value);
+    const delivery_type = document.getElementById('editProductDeliveryType').value;
+
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/admin/products/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ name, description, price, delivery_type })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || '更新失败');
+            return;
+        }
+
+        alert('商品更新成功！');
+        closeEditProductModal();
+        loadProducts();
+    } catch (error) {
+        console.error('更新商品失败:', error);
+        alert('更新失败，请稍后重试');
     }
 }
 

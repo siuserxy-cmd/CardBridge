@@ -410,6 +410,39 @@
         </div>
     </div>
 
+    <!-- 编辑商品模态框 -->
+    <div class="modal" id="editProductModal">
+        <div class="modal-content">
+            <div class="modal-header">编辑商品</div>
+            <form id="editProductForm">
+                <input type="hidden" id="editProductId">
+                <div class="form-group">
+                    <label class="form-label">商品名称</label>
+                    <input type="text" class="form-input" id="editProductName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">商品描述</label>
+                    <textarea class="form-textarea" id="editProductDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">价格（元）</label>
+                    <input type="number" class="form-input" id="editProductPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">交付方式</label>
+                    <select class="form-input" id="editProductDeliveryType">
+                        <option value="email">邮件发卡</option>
+                        <option value="auto_recharge">自动充值</option>
+                    </select>
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditProductModal()">取消</button>
+                    <button type="submit" class="btn">保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="/js/admin.js"></script>
 </body>
 </html>
