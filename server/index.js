@@ -61,6 +61,16 @@ app.get('/payment/:orderNo', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'payment.html'));
 });
 
+// 订单成功页（展示卡密）
+app.get('/order/:orderNo', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'order.html'));
+});
+
+// 订单查询页
+app.get('/lookup', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'lookup.html'));
+});
+
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
 });

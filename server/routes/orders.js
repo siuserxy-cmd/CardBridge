@@ -538,6 +538,98 @@ router.get('/recharge-status/:orderNo', async (req, res) => {
 });
 
 // ============================================
+// 游客订单查询（通过邮箱 + 订单号）
+// ============================================
+router.get('/lookup', async (req, res) => {
+    try {
+        const { email, orderNo } = req.query;
+        if (!email || !orderNo) {
+            return res.status(400).json({ error: '请提供邮箱和订单号' });
+        }
+
+        const order = await dbGet(`
+            SELECT o.*, p.name as product_name, p.delivery_type
+            FROM orders o
+            JOIN products p ON o.product_id = p.id
+            WHERE o.transaction_id = ? AND o.buyer_email = ?
+        `, [orderNo, email]);
+
+        if (!order) {
+            return res.status(404).json({ error: '订单不存在或邮箱不匹配' });
+        }
+
+        let cards = [];
+        if (order.payment_status === 'paid') {
+            cards = await dbAll(`
+                SELECT card_number, card_password FROM cards
+                WHERE order_id = ? AND status = 'sold'
+            `, [order.id]);
+        }
+
+        res.json({
+            orderNo: order.transaction_id,
+            productName: order.product_name,
+            amount: order.amount,
+            quantity: order.quantity,
+            status: order.payment_status,
+            deliveryType: order.delivery_type || 'email',
+            rechargeStatus: order.recharge_status,
+            createdAt: order.created_at,
+            paidAt: order.paid_at,
+            cards: cards,
+        });
+    } catch (error) {
+        console.error('订单查询错误:', error);
+        res.status(500).json({ error: '查询失败' });
+    }
+});
+
+// ============================================
+// 订单详情页（支付成功后展示卡密，通过订单号访问）
+// ============================================
+router.get('/detail/:orderNo', async (req, res) => {
+    try {
+        const { orderNo } = req.params;
+
+        const order = await dbGet(`
+            SELECT o.*, p.name as product_name, p.delivery_type
+            FROM orders o
+            JOIN products p ON o.product_id = p.id
+            WHERE o.transaction_id = ?
+        `, [orderNo]);
+
+        if (!order) {
+            return res.status(404).json({ error: '订单不存在' });
+        }
+
+        let cards = [];
+        if (order.payment_status === 'paid') {
+            cards = await dbAll(`
+                SELECT card_number, card_password FROM cards
+                WHERE order_id = ? AND status = 'sold'
+            `, [order.id]);
+        }
+
+        res.json({
+            orderNo: order.transaction_id,
+            email: order.buyer_email,
+            productName: order.product_name,
+            amount: order.amount,
+            quantity: order.quantity,
+            status: order.payment_status,
+            deliveryType: order.delivery_type || 'email',
+            rechargeStatus: order.recharge_status,
+            createdAt: order.created_at,
+            paidAt: order.paid_at,
+            cards: cards,
+        });
+    } catch (error) {
+        console.error('订单详情错误:', error);
+        res.status(500).json({ error: '查询失败' });
+    }
+});
+
+// ============================================
 // 查询订单详情（包含卡密）
 // ============================================
 router.get('/:id', authenticateToken, async (req, res) => {
