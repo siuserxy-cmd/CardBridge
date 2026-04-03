@@ -13,15 +13,11 @@ RUN npm install --production
 # 复制所有文件
 COPY . .
 
-# 初始化数据库
-RUN npm run init-db
-RUN npm run migrate-db
-
 # 暴露端口
 EXPOSE 3000
 
 # 设置环境变量
 ENV NODE_ENV=production
 
-# 启动应用
+# 启动时初始化+迁移+启动（数据库在 volume 中持久化）
 CMD ["sh", "-c", "npm run init-db && npm run migrate-db && npm start"]
