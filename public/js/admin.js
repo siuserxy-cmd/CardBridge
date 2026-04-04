@@ -1,5 +1,10 @@
 const API_BASE = window.location.origin + '/api';
 
+// 分页状态
+let orderPage = 1;
+const orderPageSize = 50;
+let orderStatusFilter = 'all';
+
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
     await checkAdminAuth();
@@ -124,19 +129,35 @@ async function loadProducts() {
     }
 }
 
+// 订单筛选
+function filterOrders(status) {
+    orderStatusFilter = status;
+    orderPage = 1;
+    loadOrders();
+}
+
+function goOrderPage(page) {
+    orderPage = page;
+    loadOrders();
+}
+
 // 加载订单列表
 async function loadOrders() {
     try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE}/admin/orders`, {
+        const response = await fetch(`${API_BASE}/admin/orders?page=${orderPage}&pageSize=${orderPageSize}&status=${orderStatusFilter}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        const orders = await response.json();
+        const data = await response.json();
+        const orders = data.orders || data;
+        const pagination = data.pagination;
 
         const tbody = document.querySelector('#ordersTable tbody');
-        if (orders.length === 0) {
+        if (!orders.length) {
             tbody.innerHTML = '<tr><td colspan="7" class="loading">暂无订单</td></tr>';
+            const paginationEl = document.getElementById('orderPagination');
+            if (paginationEl) paginationEl.innerHTML = '';
             return;
         }
 
@@ -174,6 +195,21 @@ async function loadOrders() {
                 </tr>
             `;
         }).join('');
+
+        // 渲染分页
+        if (pagination) {
+            const paginationEl = document.getElementById('orderPagination');
+            if (paginationEl) {
+                const { page, totalPages, total } = pagination;
+                let html = `<span style="color:#94a3b8;font-size:0.82rem;">共 ${total} 条</span>`;
+                if (totalPages > 1) {
+                    html += ` <button onclick="goOrderPage(${page - 1})" ${page <= 1 ? 'disabled' : ''} style="padding:0.3rem 0.6rem;border:1px solid rgba(148,163,184,0.2);background:rgba(255,255,255,0.04);color:#eef4fb;border-radius:6px;cursor:pointer;font-size:0.82rem;">上一页</button>`;
+                    html += ` <span style="color:#eef4fb;font-size:0.82rem;">${page} / ${totalPages}</span>`;
+                    html += ` <button onclick="goOrderPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''} style="padding:0.3rem 0.6rem;border:1px solid rgba(148,163,184,0.2);background:rgba(255,255,255,0.04);color:#eef4fb;border-radius:6px;cursor:pointer;font-size:0.82rem;">下一页</button>`;
+                }
+                paginationEl.innerHTML = html;
+            }
+        }
     } catch (error) {
         console.error('加载订单列表失败:', error);
     }
@@ -450,9 +486,9 @@ async function loadCDKList() {
                 </td>
                 <td>${typeLabel}</td>
                 <td>${statusLabel}</td>
-                <td>${c.order_no || '-'}</td>
-                <td>${c.used_at || c.sold_at || '-'}</td>
-                <td style="color:${c.error_info ? '#ef4444' : '#94a3b8'};font-size:0.82rem;">${c.error_info || '-'}</td>
+                <td>${escapeHtml(c.order_no || '-')}</td>
+                <td>${escapeHtml(c.used_at || c.sold_at || '-')}</td>
+                <td style="color:${c.error_info ? '#ef4444' : '#94a3b8'};font-size:0.82rem;">${escapeHtml(c.error_info || '-')}</td>
                 <td>${c.created_at ? new Date(c.created_at).toLocaleString() : '-'}</td>
                 <td>${c.status === 'available' ? `<button class="btn" style="padding:0.4rem 0.8rem;font-size:0.8rem;background:#dc2626;" onclick="deleteCDK(${c.id})">删除</button>` : ''}</td>
             </tr>`;
@@ -543,6 +579,62 @@ async function deleteCDK(id) {
         }
     } catch (e) {
         alert('删除失败');
+    }
+}
+
+// 修改密码
+async function changePassword() {
+    const oldPassword = prompt('请输入当前密码:');
+    if (!oldPassword) return;
+    const newPassword = prompt('请输入新密码（至少6位）:');
+    if (!newPassword) return;
+    if (newPassword.length < 6) { alert('新密码长度至少为 6 位'); return; }
+    const confirmPassword = prompt('请再次输入新密码:');
+    if (newPassword !== confirmPassword) { alert('两次输入的密码不一致'); return; }
+
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE}/auth/change-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ oldPassword, newPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || '修改失败'); return; }
+        alert('密码修改成功，请重新登录');
+        localStorage.removeItem('token');
+        window.location.href = '/';
+    } catch (e) {
+        alert('修改失败，请重试');
+    }
+}
+
+// 导出订单为 CSV
+async function exportOrders() {
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE}/admin/orders?page=1&pageSize=10000&status=${orderStatusFilter}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        const orders = data.orders || data;
+        if (!orders.length) { alert('没有可导出的订单'); return; }
+
+        const BOM = '\uFEFF';
+        const header = '订单号,邮箱,商品,数量,金额,支付方式,状态,创建时间\n';
+        const rows = orders.map(o =>
+            `${o.transaction_id || ''},${o.email || o.buyer_email || ''},${escapeHtml(o.product_name).replace(/,/g, '，')},${o.quantity || 1},${o.amount},${o.payment_method === 'alipay' ? '支付宝' : '微信'},${o.payment_status},${o.created_at}`
+        ).join('\n');
+
+        const blob = new Blob([BOM + header + rows], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert('导出失败');
     }
 }
 

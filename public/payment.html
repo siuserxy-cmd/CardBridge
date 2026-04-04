@@ -585,7 +585,7 @@ function renderPayment() {
 
                 <div class="order-info">
                     <span class="order-info-label">订单号:</span>
-                    <span class="order-info-value">${orderNo}</span>
+                    <span class="order-info-value">${escHtml(orderNo)}</span>
                     <span class="order-info-label">商品:</span>
                     <span class="order-info-value">${escHtml(orderData.productName || '')}</span>
                     <span class="order-info-label">金额:</span>
@@ -689,7 +689,7 @@ function renderSuccess(data) {
 
                 <div class="order-info" style="margin-bottom:1.5rem;">
                     <span class="order-info-label">订单号:</span>
-                    <span class="order-info-value">${orderNo}</span>
+                    <span class="order-info-value">${escHtml(orderNo)}</span>
                     <span class="order-info-label">商品:</span>
                     <span class="order-info-value">${escHtml(d?.productName || '')}</span>
                     <span class="order-info-label">金额:</span>

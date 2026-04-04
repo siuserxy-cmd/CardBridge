@@ -43,6 +43,9 @@ app.use((req, res, next) => {
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
+    if (process.env.NODE_ENV === 'production') {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
     next();
 });
 
@@ -117,7 +120,12 @@ app.get('/admin', (req, res) => {
 
 // 404 处理
 app.use((req, res) => {
-    res.status(404).json({ error: '接口不存在' });
+    // API 请求返回 JSON
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: '接口不存在' });
+    }
+    // 页面请求返回友好的 404 页面
+    res.status(404).send(`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>页面不存在</title></head><body style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0d10;color:#eef4fb;font-family:monospace;"><div style="text-align:center;"><div style="font-size:4rem;margin-bottom:1rem;color:#728092;">404</div><p style="color:#728092;margin-bottom:1.5rem;">页面不存在或已被移除</p><a href="/" style="color:#c7ff6b;border:1px solid rgba(199,255,107,0.2);padding:0.6rem 1.4rem;border-radius:999px;text-decoration:none;">返回首页</a></div></body></html>`);
 });
 
 // 全局错误处理

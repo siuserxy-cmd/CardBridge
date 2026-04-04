@@ -135,4 +135,39 @@ router.get('/me', authenticateToken, async (req, res) => {
     }
 });
 
+// ============================================
+// 修改密码
+// ============================================
+router.post('/change-password', authenticateToken, async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ error: '请填写旧密码和新密码' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: '新密码长度至少为 6 位' });
+        }
+
+        const user = await dbGet('SELECT * FROM users WHERE id = ?', [req.user.userId]);
+        if (!user) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+
+        const validPassword = await bcrypt.compare(oldPassword, user.password);
+        if (!validPassword) {
+            return res.status(401).json({ error: '旧密码错误' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await dbRun('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, user.id]);
+
+        res.json({ message: '密码修改成功' });
+    } catch (error) {
+        console.error('修改密码错误:', error);
+        res.status(500).json({ error: '修改密码失败' });
+    }
+});
+
 module.exports = router;

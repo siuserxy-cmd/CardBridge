@@ -6,6 +6,12 @@ const { releaseExpiredReservations, releaseOrderReservation, syncProductStock } 
 
 const router = express.Router();
 
+// 管理操作审计日志
+function auditLog(adminEmail, action, detail = '') {
+    const timestamp = new Date().toISOString();
+    console.log(`[AUDIT] ${timestamp} | ${adminEmail} | ${action} | ${detail}`);
+}
+
 // 所有管理接口都需要管理员权限
 router.use(authenticateToken, requireAdmin);
 
@@ -27,6 +33,7 @@ router.post('/products', async (req, res) => {
             VALUES (?, ?, ?, 0, 'out_of_stock', ?)
         `, [name, description, price, delivery_type || 'email']);
 
+        auditLog(req.user.email, 'ADD_PRODUCT', `id=${result.id} name=${name} price=${price}`);
         res.status(201).json({
             message: '商品添加成功',
             productId: result.id
@@ -49,6 +56,7 @@ router.put('/products/:id', async (req, res) => {
             WHERE id = ?
         `, [name, description, price, status, delivery_type || null, id]);
 
+        auditLog(req.user.email, 'UPDATE_PRODUCT', `id=${id} name=${name}`);
         res.json({ message: '商品更新成功' });
     } catch (error) {
         console.error('更新商品错误:', error);
@@ -79,6 +87,7 @@ router.delete('/products/:id', async (req, res) => {
 
         await dbRun('DELETE FROM products WHERE id = ?', [id]);
 
+        auditLog(req.user.email, 'DELETE_PRODUCT', `id=${id}`);
         res.json({
             message: '商品删除成功',
             unusedCards: 0
@@ -123,6 +132,7 @@ router.post('/cards', async (req, res) => {
             // 更新库存
             await syncProductStock(productId);
 
+            auditLog(req.user.email, 'IMPORT_CDK', `productId=${productId} success=${successCount}/${lines.length} type=${type}`);
             return res.json({ message: `成功导入 ${successCount} 个 CDK`, successCount, totalCount: lines.length });
         }
 
@@ -231,6 +241,24 @@ router.get('/orders', async (req, res) => {
     try {
         await releaseExpiredReservations();
 
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 50));
+        const statusFilter = req.query.status || 'all';
+        const offset = (page - 1) * pageSize;
+
+        let whereClause = '';
+        const params = [];
+        if (statusFilter && statusFilter !== 'all') {
+            whereClause = 'AND o.payment_status = ?';
+            params.push(statusFilter);
+        }
+
+        const countResult = await dbGet(`
+            SELECT COUNT(*) as total FROM orders o
+            JOIN products p ON o.product_id = p.id
+            WHERE 1=1 ${whereClause}
+        `, params);
+
         const orders = await dbAll(`
             SELECT
                 o.id,
@@ -253,12 +281,22 @@ router.get('/orders', async (req, res) => {
             LEFT JOIN users u ON o.user_id = u.id AND o.user_id != 0
             JOIN products p ON o.product_id = p.id
             LEFT JOIN cards c ON o.card_id = c.id
+            WHERE 1=1 ${whereClause}
             ORDER BY
                 CASE WHEN o.payment_status = 'confirming' THEN 0 ELSE 1 END,
                 o.created_at DESC
-        `);
+            LIMIT ? OFFSET ?
+        `, [...params, pageSize, offset]);
 
-        res.json(orders);
+        res.json({
+            orders,
+            pagination: {
+                page,
+                pageSize,
+                total: countResult.total,
+                totalPages: Math.ceil(countResult.total / pageSize)
+            }
+        });
     } catch (error) {
         console.error('查询订单错误:', error);
         res.status(500).json({ error: '查询订单失败' });
@@ -282,6 +320,7 @@ router.post('/orders/:id/confirm', async (req, res) => {
         }
 
         await processPaymentSuccess(order.id, order.transaction_id);
+        auditLog(req.user.email, 'CONFIRM_ORDER', `orderId=${id} txn=${order.transaction_id}`);
         res.json({ message: '已确认收款，卡密已自动发送' });
     } catch (error) {
         console.error('确认收款错误:', error);
@@ -294,6 +333,7 @@ router.post('/orders/:id/reject', async (req, res) => {
     try {
         const { id } = req.params;
         await releaseOrderReservation(id, 'cancelled');
+        auditLog(req.user.email, 'REJECT_ORDER', `orderId=${id}`);
         res.json({ message: '订单已拒绝' });
     } catch (error) {
         console.error('拒绝订单错误:', error);

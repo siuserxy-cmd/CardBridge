@@ -20,7 +20,8 @@ function parsePaymentPayload(payload) {
     try {
         return JSON.parse(payload);
     } catch (error) {
-        return {};
+        console.warn('⚠️  payment_payload 解析失败:', error.message);
+        return { manualMode: false };
     }
 }
 
@@ -82,19 +83,20 @@ async function releaseOrderReservation(orderId, nextStatus = 'cancelled', runner
 }
 
 async function releaseExpiredReservations() {
-    const expiredOrders = await dbAll(`
-        SELECT id, product_id
-        FROM orders
-        WHERE payment_status IN ('pending', 'confirming')
-          AND reservation_expires_at IS NOT NULL
-          AND reservation_expires_at <= CURRENT_TIMESTAMP
-    `);
+    // 整个操作在事务内完成，避免 SELECT 和 UPDATE 之间的竞态
+    return dbTransaction(async (runner) => {
+        const expiredOrders = await runner.dbAll(`
+            SELECT id, product_id
+            FROM orders
+            WHERE payment_status IN ('pending', 'confirming')
+              AND reservation_expires_at IS NOT NULL
+              AND reservation_expires_at <= CURRENT_TIMESTAMP
+        `);
 
-    if (!expiredOrders.length) {
-        return 0;
-    }
+        if (!expiredOrders.length) {
+            return 0;
+        }
 
-    await dbTransaction(async (runner) => {
         const orderIds = expiredOrders.map(order => order.id);
         const placeholders = orderIds.map(() => '?').join(', ');
 
@@ -114,9 +116,8 @@ async function releaseExpiredReservations() {
         );
 
         await syncProductStocks(expiredOrders.map(order => order.product_id), runner);
+        return expiredOrders.length;
     });
-
-    return expiredOrders.length;
 }
 
 module.exports = {

@@ -155,8 +155,7 @@ async function insertDefaultData() {
                 } else if (this.changes > 0) {
                     console.log('✅ 管理员账号创建成功');
                     console.log(`   邮箱: ${adminEmail}`);
-                    console.log(`   密码: ${adminPassword}`);
-                    console.log('   ⚠️  请立即修改默认密码！');
+                    console.log('   ⚠️  请立即登录 /admin 修改默认密码！');
                 } else {
                     console.log('ℹ️  管理员账号已存在');
                 }

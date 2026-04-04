@@ -1,5 +1,12 @@
 const nodemailer = require('nodemailer');
 
+function maskEmail(email) {
+    if (!email) return '***';
+    const [user, domain] = email.split('@');
+    if (!domain) return '***';
+    return user.slice(0, 2) + '***@' + domain;
+}
+
 // ============================================
 // 创建邮件发送器
 // 支持 QQ邮箱 / 163邮箱 / Gmail / SMTP 自定义
@@ -118,6 +125,7 @@ async function sendCardEmail({ toEmail, productName, cards, orderNo, amount }) {
         <!-- 底部 -->
         <div style="text-align:center;color:#475569;font-size:12px;">
             <p style="margin:0;">此邮件由 ${shopName} 系统自动发送，请勿直接回复</p>
+            ${process.env.CONTACT_INFO ? `<p style="margin:6px 0 0;color:#64748b;">${process.env.CONTACT_INFO}</p>` : ''}
         </div>
     </div>
 </body>
@@ -130,7 +138,7 @@ async function sendCardEmail({ toEmail, productName, cards, orderNo, amount }) {
         html,
     });
 
-    console.log(`✉️  卡密邮件已发送至 ${toEmail}，消息ID: ${info.messageId}`);
+    console.log(`✉️  卡密邮件已发送至 ${maskEmail(toEmail)}，消息ID: ${info.messageId}`);
     return info;
 }
 
@@ -222,6 +230,7 @@ async function sendRechargeEmail({ toEmail, productName, orderNo, amount, status
         <!-- 底部 -->
         <div style="text-align:center;color:#475569;font-size:12px;">
             <p style="margin:0;">此邮件由 ${shopName} 系统自动发送，请勿直接回复</p>
+            ${process.env.CONTACT_INFO ? `<p style="margin:6px 0 0;color:#64748b;">${process.env.CONTACT_INFO}</p>` : ''}
         </div>
     </div>
 </body>
@@ -238,7 +247,7 @@ async function sendRechargeEmail({ toEmail, productName, orderNo, amount, status
         html,
     });
 
-    console.log(`✉️  充值${isSuccess ? '成功' : '失败'}邮件已发送至 ${toEmail}，消息ID: ${info.messageId}`);
+    console.log(`✉️  充值${isSuccess ? '成功' : '失败'}邮件已发送至 ${maskEmail(toEmail)}，消息ID: ${info.messageId}`);
     return info;
 }
 

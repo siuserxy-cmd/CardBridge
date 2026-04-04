@@ -85,19 +85,32 @@ function updateUserMenu() {
 
 // 显示用户菜单
 function showUserMenu() {
+    // 如果已有菜单则关闭
+    const existing = document.getElementById('userDropdown');
+    if (existing) { existing.remove(); return; }
+
     const isAdmin = currentUser && currentUser.isAdmin;
-    const menuHtml = `
-        <div style="position: absolute; right: 2rem; top: 4rem; background: #1e293b; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 1rem; min-width: 150px;">
-            <div style="color: #94a3b8; font-size: 0.875rem; margin-bottom: 0.5rem;">${currentUser.email}</div>
-            ${isAdmin ? '<a href="/admin" style="display: block; color: #f8fafc; text-decoration: none; padding: 0.5rem 0; border-bottom: 1px solid rgba(148, 163, 184, 0.1);">管理后台</a>' : ''}
-            <a onclick="viewMyOrders()" style="display: block; color: #f8fafc; text-decoration: none; padding: 0.5rem 0; cursor: pointer;">我的订单</a>
-            <a onclick="logout()" style="display: block; color: #ef4444; text-decoration: none; padding: 0.5rem 0; cursor: pointer;">退出登录</a>
-        </div>
+    const menu = document.createElement('div');
+    menu.id = 'userDropdown';
+    menu.style.cssText = 'position:fixed;right:2rem;top:4.5rem;background:rgba(20,25,33,0.98);border:1px solid rgba(148,163,184,0.15);border-radius:14px;padding:0.6rem 0;min-width:180px;z-index:9999;backdrop-filter:blur(16px);box-shadow:0 12px 40px rgba(0,0,0,0.5);';
+    menu.innerHTML = `
+        <div style="color:#94a3b8;font-size:0.78rem;padding:0.5rem 1rem 0.6rem;border-bottom:1px solid rgba(148,163,184,0.1);">${escapeHtml(currentUser.email)}</div>
+        ${isAdmin ? '<a href="/admin" style="display:block;color:#eef4fb;text-decoration:none;padding:0.6rem 1rem;font-size:0.88rem;transition:0.15s;" onmouseover="this.style.background=\'rgba(199,255,107,0.08)\'" onmouseout="this.style.background=\'none\'">管理后台</a>' : ''}
+        <a onclick="viewMyOrders();document.getElementById(\'userDropdown\')?.remove();" style="display:block;color:#eef4fb;text-decoration:none;padding:0.6rem 1rem;cursor:pointer;font-size:0.88rem;transition:0.15s;" onmouseover="this.style.background='rgba(199,255,107,0.08)'" onmouseout="this.style.background='none'">我的订单</a>
+        <div style="border-top:1px solid rgba(148,163,184,0.1);margin:0.3rem 0;"></div>
+        <a onclick="logout()" style="display:block;color:#ff857f;text-decoration:none;padding:0.6rem 1rem;cursor:pointer;font-size:0.88rem;transition:0.15s;" onmouseover="this.style.background='rgba(255,133,127,0.08)'" onmouseout="this.style.background='none'">退出登录</a>
     `;
-    // 简单实现：使用 confirm
-    if (confirm('查看我的订单？')) {
-        viewMyOrders();
-    }
+    document.body.appendChild(menu);
+
+    // 点击外部关闭
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target) && e.target.id !== 'userMenuBtn') {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        });
+    }, 10);
 }
 
 // 退出登录
@@ -317,28 +330,51 @@ async function viewMyOrders() {
     try {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE}/orders`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const orders = await response.json();
 
+        // 创建订单模态框
+        const existing = document.getElementById('ordersModal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'ordersModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+        const statusMap = { paid: '已支付', pending: '待支付', confirming: '待确认', cancelled: '已取消', expired: '已过期' };
+        const statusColor = { paid: '#79f2aa', pending: '#ffd86a', confirming: '#ffd86a', cancelled: '#ff857f', expired: '#ff857f' };
+
+        let content;
         if (orders.length === 0) {
-            alert('您还没有订单');
-            return;
+            content = '<div style="text-align:center;color:#728092;padding:2rem;">暂无订单记录</div>';
+        } else {
+            content = orders.map(o => `
+                <div style="padding:1rem;border:1px solid rgba(180,192,205,0.1);border-radius:12px;background:rgba(255,255,255,0.02);margin-bottom:0.8rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                        <span style="font-weight:600;">${escapeHtml(o.product_name)}</span>
+                        <span style="color:${statusColor[o.payment_status] || '#728092'};font-size:0.82rem;">${statusMap[o.payment_status] || o.payment_status}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;color:#728092;font-size:0.82rem;">
+                        <span>¥${parseFloat(o.amount).toFixed(2)}</span>
+                        <span>${new Date(o.created_at).toLocaleString()}</span>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        // 简单展示订单列表
-        let ordersHtml = '您的订单：\n\n';
-        orders.forEach((order, index) => {
-            ordersHtml += `${index + 1}. ${order.product_name}\n`;
-            ordersHtml += `   金额: ¥${order.amount}\n`;
-            ordersHtml += `   状态: ${order.payment_status === 'paid' ? '已支付' : '待支付'}\n`;
-            ordersHtml += `   时间: ${new Date(order.created_at).toLocaleString()}\n\n`;
-        });
-
-        alert(ordersHtml);
+        modal.innerHTML = `
+            <div style="background:rgba(16,20,26,0.98);border:1px solid rgba(180,192,205,0.14);border-radius:20px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+                <div style="padding:1.2rem 1.5rem;border-bottom:1px solid rgba(180,192,205,0.1);display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-weight:700;font-size:1.1rem;">我的订单</span>
+                    <button onclick="document.getElementById('ordersModal').remove()" style="background:none;border:none;color:#728092;font-size:1.4rem;cursor:pointer;padding:0.2rem 0.4rem;">&times;</button>
+                </div>
+                <div style="padding:1.2rem 1.5rem;">${content}</div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
     } catch (error) {
         console.error('查询订单失败:', error);
         alert('查询订单失败');

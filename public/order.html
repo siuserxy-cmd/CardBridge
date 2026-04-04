@@ -232,7 +232,7 @@ function render(d) {
 
     let orderInfoHtml = `
         <div class="order-info">
-            <span class="order-info-label">订单号:</span><span class="order-info-value">${d.orderNo}</span>
+            <span class="order-info-label">订单号:</span><span class="order-info-value">${esc(d.orderNo)}</span>
             <span class="order-info-label">商品:</span><span class="order-info-value">${esc(d.productName)}</span>
             <span class="order-info-label">数量:</span><span class="order-info-value">${d.quantity} 件</span>
             <span class="order-info-label">金额:</span><span class="order-info-value amount">¥${parseFloat(d.amount).toFixed(2)}</span>
@@ -306,7 +306,7 @@ function render(d) {
                     <p class="success-sub">请完成支付后再查看卡密。</p>
                     ${orderInfoHtml}
                     <div style="margin-top:1.5rem;">
-                        <button class="btn-home" onclick="location.href='/payment/${d.orderNo}'">去支付</button>
+                        <button class="btn-home" onclick="location.href='/payment/${encodeURIComponent(d.orderNo)}'">去支付</button>
                         <button class="btn-lookup" onclick="location.href='/'">返回首页</button>
                     </div>
                 </div>

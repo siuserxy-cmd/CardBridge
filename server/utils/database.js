@@ -62,10 +62,25 @@ const dbTransaction = async (handler) => {
     }
 };
 
+// 优雅关闭数据库连接
+function closeDatabase() {
+    return new Promise((resolve) => {
+        db.close((err) => {
+            if (err) console.error('关闭数据库失败:', err.message);
+            else console.log('✅ 数据库连接已关闭');
+            resolve();
+        });
+    });
+}
+
+process.on('SIGTERM', async () => { await closeDatabase(); });
+process.on('SIGINT', async () => { await closeDatabase(); });
+
 module.exports = {
     db,
     dbGet,
     dbAll,
     dbRun,
-    dbTransaction
+    dbTransaction,
+    closeDatabase
 };

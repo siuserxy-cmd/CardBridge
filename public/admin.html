@@ -245,9 +245,10 @@
     <nav class="navbar">
         <div class="navbar-container">
             <div class="logo">✦ 管理后台</div>
-            <div>
-                <a href="/" style="color: #94a3b8; text-decoration: none; margin-right: 1rem;">返回前台</a>
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <a href="/" style="color: #94a3b8; text-decoration: none;">返回前台</a>
                 <span style="color: #94a3b8;" id="adminEmail"></span>
+                <button onclick="changePassword()" style="padding:0.4rem 0.8rem;font-size:0.78rem;background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.2);border-radius:6px;cursor:pointer;">修改密码</button>
             </div>
         </div>
     </nav>
@@ -339,7 +340,20 @@
 
         <!-- 订单管理 -->
         <div class="section">
-            <div class="section-title">订单管理</div>
+            <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.8rem;">
+                <span>订单管理</span>
+                <div style="display:flex;align-items:center;gap:0.6rem;font-size:0.82rem;">
+                    <select onchange="filterOrders(this.value)" class="form-input" style="width:auto;padding:0.4rem 0.8rem;font-size:0.82rem;">
+                        <option value="all">全部状态</option>
+                        <option value="confirming">待确认</option>
+                        <option value="paid">已支付</option>
+                        <option value="pending">待支付</option>
+                        <option value="cancelled">已取消</option>
+                        <option value="expired">已过期</option>
+                    </select>
+                    <button onclick="exportOrders()" class="btn btn-secondary" style="padding:0.4rem 0.8rem;font-size:0.82rem;">导出CSV</button>
+                </div>
+            </div>
             <table id="ordersTable">
                 <thead>
                     <tr>
@@ -356,6 +370,7 @@
                     <tr><td colspan="7" class="loading">加载中...</td></tr>
                 </tbody>
             </table>
+            <div id="orderPagination" style="display:flex;align-items:center;gap:0.8rem;justify-content:center;padding:1rem 0;"></div>
         </div>
     </div>
 
@@ -443,6 +458,6 @@
         </div>
     </div>
 
-    <script src="/js/admin.js?v=20260403"></script>
+    <script src="/js/admin.js?v=20260404"></script>
 </body>
 </html>

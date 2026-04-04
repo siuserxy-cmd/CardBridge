@@ -168,6 +168,36 @@ async function migrate() {
         )
     `, '同步历史已售数量');
 
+    // 15. 关键查询索引（提升订单查询、回调处理、过期清理性能）
+    await safeRun(
+        `CREATE INDEX IF NOT EXISTS idx_orders_transaction_id ON orders(transaction_id)`,
+        '创建 orders.transaction_id 索引'
+    );
+    await safeRun(
+        `CREATE INDEX IF NOT EXISTS idx_orders_buyer_email ON orders(buyer_email)`,
+        '创建 orders.buyer_email 索引'
+    );
+    await safeRun(
+        `CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)`,
+        '创建 orders.user_id 索引'
+    );
+    await safeRun(
+        `CREATE INDEX IF NOT EXISTS idx_orders_payment_status ON orders(payment_status)`,
+        '创建 orders.payment_status 索引'
+    );
+    await safeRun(
+        `CREATE INDEX IF NOT EXISTS idx_orders_reservation_expires ON orders(reservation_expires_at)`,
+        '创建 orders.reservation_expires_at 索引'
+    );
+    await safeRun(
+        `CREATE INDEX IF NOT EXISTS idx_cards_order_id ON cards(order_id)`,
+        '创建 cards.order_id 索引'
+    );
+    await safeRun(
+        `CREATE INDEX IF NOT EXISTS idx_cards_product_status ON cards(product_id, status)`,
+        '创建 cards(product_id, status) 复合索引'
+    );
+
     console.log('\n🎉 数据库迁移完成！');
     db.close();
     process.exit(0);
