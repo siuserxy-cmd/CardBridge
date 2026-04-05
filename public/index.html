@@ -9,6 +9,7 @@
     <meta property="og:description" content="提供优质数字商品，自动发卡，安全快捷。">
     <meta property="og:type" content="website">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='28' font-size='28'%3E%3E%3C/text%3E%3C/svg%3E">
+    <link rel="canonical" href="/">
     <title>数字商店 - 优质数字商品售卖平台</title>
     <style>
         :root {
@@ -1272,10 +1273,16 @@
             </div>
         </div>
         <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:1rem;text-align:center;">
-            <p>&copy; 2025 数字商店 - 保留所有权利</p>
+            <p>&copy; 2026 数字商店 - 保留所有权利</p>
         </div>
     </footer>
 
-    <script src="/js/main.js?v=20260401"></script>
+    <script src="/js/main.js?v=20260405"></script>
+    <script>
+    // 51.la 统计
+    fetch('/api/config/public').then(r=>r.json()).then(c=>{
+        if(c.analytics51laId){const s=document.createElement('script');s.src='https://sdk.51.la/js-sdk-pro.min.js?id='+c.analytics51laId;s.id='LA_COLLECT';document.head.appendChild(s);}
+    }).catch(()=>{});
+    </script>
 </body>
 </html>

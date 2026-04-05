@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>商品详情 - 数字商店</title>
+    <link rel="canonical" id="canonicalLink" href="">
+    <meta name="description" id="metaDesc" content="数字商店优质商品，安全快捷，自动发卡。">
     <style>
         :root {
             --bg: #0b0d10;
@@ -636,6 +638,30 @@ async function loadProduct() {
         product = await res.json();
 
         document.title = `${product.name} - 数字商店`;
+
+        // SEO: canonical + meta description
+        const canonicalEl = document.getElementById('canonicalLink');
+        if (canonicalEl) canonicalEl.href = `${location.origin}/product/${productId}`;
+        const metaDesc = document.getElementById('metaDesc');
+        if (metaDesc) metaDesc.content = `${product.name} - ${product.description || '数字商店优质商品，安全快捷，自动发卡。'}`;
+
+        // SEO: JSON-LD 结构化数据
+        const jsonLd = document.createElement('script');
+        jsonLd.type = 'application/ld+json';
+        jsonLd.textContent = JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": product.name,
+            "description": product.description || '',
+            "offers": {
+                "@type": "Offer",
+                "price": product.price,
+                "priceCurrency": "CNY",
+                "availability": product.status === 'in_stock' ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+            }
+        });
+        document.head.appendChild(jsonLd);
+
         renderPage();
     } catch (e) {
         document.getElementById('app').innerHTML = `
@@ -933,6 +959,11 @@ function escHtml(str) {
 }
 
 loadProduct();
+
+// 加载统计代码
+fetch('/api/config/public').then(r=>r.json()).then(c=>{
+    if(c.analytics51laId){const s=document.createElement('script');s.src='https://sdk.51.la/js-sdk-pro.min.js?id='+c.analytics51laId;s.id='LA_COLLECT';document.head.appendChild(s);}
+}).catch(()=>{});
 </script>
 
 </body>

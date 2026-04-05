@@ -841,6 +841,7 @@ function escHtml(str) {
 }
 
 init();
+fetch('/api/config/public').then(r=>r.json()).then(c=>{if(c.analytics51laId){const s=document.createElement('script');s.src='https://sdk.51.la/js-sdk-pro.min.js?id='+c.analytics51laId;s.id='LA_COLLECT';document.head.appendChild(s);}}).catch(()=>{});
 </script>
 </body>
 </html>

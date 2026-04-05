@@ -71,6 +71,7 @@ const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
 const orderRoutes = require('./routes/orders');
 const adminRoutes = require('./routes/admin');
+const { dbAll } = require('./utils/database');
 const { orderLimit, authLimit, apiLimit } = require('./middleware/rate-limit');
 
 // 挂载路由（含限流）
@@ -82,12 +83,43 @@ app.post('/api/orders/create', orderLimit);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', apiLimit, adminRoutes);
 
+// 公开配置（前端统计等）
+app.get('/api/config/public', (req, res) => {
+    res.json({
+        analytics51laId: process.env.ANALYTICS_51LA_ID || '',
+        shopName: process.env.SHOP_NAME || '数字商店'
+    });
+});
+
 // ============================================
 // 首页路由
 // ============================================
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+// 动态 sitemap.xml（SEO）
+app.get('/sitemap.xml', async (req, res) => {
+    try {
+        const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+        const products = await dbAll("SELECT id, updated_at FROM products WHERE status = 'in_stock' ORDER BY id");
+        const now = new Date().toISOString().slice(0, 10);
+
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+        xml += `  <url><loc>${appUrl}/</loc><lastmod>${now}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>\n`;
+        xml += `  <url><loc>${appUrl}/lookup</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>\n`;
+        for (const p of products) {
+            const lastmod = p.updated_at ? p.updated_at.slice(0, 10) : now;
+            xml += `  <url><loc>${appUrl}/product/${p.id}</loc><lastmod>${lastmod}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>\n`;
+        }
+        xml += `</urlset>`;
+
+        res.header('Content-Type', 'application/xml');
+        res.send(xml);
+    } catch (e) {
+        res.status(500).send('');
+    }
 });
 
 // 商品详情页（SEO 友好的独立路由）

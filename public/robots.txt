@@ -1,6 +1,9 @@
 User-agent: *
 Allow: /
+Allow: /product/
 Disallow: /admin
 Disallow: /api/
 Disallow: /payment/
 Disallow: /order/
+
+Sitemap: https://api.difference-crossword.store/sitemap.xml
