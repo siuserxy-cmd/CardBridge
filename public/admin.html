@@ -372,6 +372,104 @@
             </table>
             <div id="orderPagination" style="display:flex;align-items:center;gap:0.8rem;justify-content:center;padding:1rem 0;"></div>
         </div>
+
+        <!-- 邀请返现 -->
+        <div class="section">
+            <div class="section-title">邀请返现</div>
+            <div style="background:#0f172a;border-radius:8px;padding:1.2rem;margin-bottom:1rem;border:1px solid rgba(148,163,184,0.1);">
+                <div style="display:grid;gap:0.6rem;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));align-items:end;">
+                    <div>
+                        <label class="form-label">推广人姓名</label>
+                        <input type="text" id="refName" class="form-input" placeholder="小王">
+                    </div>
+                    <div>
+                        <label class="form-label">联系方式</label>
+                        <input type="text" id="refContact" class="form-input" placeholder="TG / 邮箱">
+                    </div>
+                    <div>
+                        <label class="form-label">佣金比例 (0-1)</label>
+                        <input type="number" id="refRate" class="form-input" value="0.10" min="0" max="1" step="0.01">
+                    </div>
+                    <div>
+                        <label class="form-label">自定义码 (可选)</label>
+                        <input type="text" id="refCode" class="form-input" placeholder="留空自动生成">
+                    </div>
+                    <div>
+                        <label class="form-label">备注</label>
+                        <input type="text" id="refNote" class="form-input" placeholder="例如：内推朋友">
+                    </div>
+                    <button class="btn" onclick="createReferralCode()" style="padding:0.65rem 1.2rem;">生成邀请码</button>
+                </div>
+                <div style="color:#94a3b8;font-size:0.78rem;margin-top:0.6rem;">
+                    推广链接格式：<code style="color:#c7ff6b;">https://你的域名/?ref=邀请码</code>，买家点击后下单自动归因。
+                </div>
+            </div>
+            <table id="referralCodesTable">
+                <thead>
+                    <tr>
+                        <th>邀请码</th>
+                        <th>推广人</th>
+                        <th>佣金比例</th>
+                        <th>订单数</th>
+                        <th>累计订单金额</th>
+                        <th>累计佣金</th>
+                        <th>待结算</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="9" class="loading">加载中...</td></tr>
+                </tbody>
+            </table>
+            <div style="margin-top:1.5rem;">
+                <div style="font-weight:700;margin-bottom:0.6rem;">返现记录 (最新 200 条)</div>
+                <table id="referralRecordsTable">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>邀请码</th>
+                            <th>推广人</th>
+                            <th>订单号</th>
+                            <th>买家邮箱</th>
+                            <th>订单金额</th>
+                            <th>佣金</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="9" class="loading">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 邮箱黑名单 -->
+        <div class="section">
+            <div class="section-title">邮箱黑名单</div>
+            <div style="background:#0f172a;border-radius:8px;padding:1.2rem;margin-bottom:1rem;border:1px solid rgba(148,163,184,0.1);">
+                <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;">
+                    <input type="email" id="blockEmailInput" class="form-input" placeholder="要拉黑的邮箱" style="flex:1;min-width:200px;">
+                    <input type="text" id="blockReasonInput" class="form-input" placeholder="原因 (可选)" style="flex:1;min-width:200px;">
+                    <button class="btn" onclick="addBlockedEmail()" style="padding:0.55rem 1.2rem;">加入黑名单</button>
+                </div>
+                <div style="color:#94a3b8;font-size:0.78rem;margin-top:0.5rem;">被拉黑的邮箱将无法在前台下单（返回 403）。</div>
+            </div>
+            <table id="blockedEmailsTable">
+                <thead>
+                    <tr>
+                        <th>邮箱</th>
+                        <th>原因</th>
+                        <th>拉黑时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" class="loading">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- 添加商品模态框 -->
@@ -397,6 +495,20 @@
                         <option value="email">邮件发卡（卡密通过邮件发送给买家）</option>
                         <option value="auto_recharge">自动充值（通过 ifaka API 自动充值到买家账号）</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">图标 (emoji，可选)</label>
+                    <input type="text" class="form-input" id="productIcon" maxlength="4" placeholder="例如 ⚡ 🚀 🔑">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">品牌色 HEX (可选)</label>
+                    <input type="text" class="form-input" id="productAccentColor" maxlength="7" placeholder="例如 #c7ff6b">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" id="productIsFeatured" style="width:auto;">
+                        标记为「最多人选」（前台显示徽章 + 排序置顶）
+                    </label>
                 </div>
                 <div class="btn-group">
                     <button type="button" class="btn btn-secondary" onclick="closeAddProductModal()">取消</button>
@@ -450,6 +562,20 @@
                         <option value="auto_recharge">自动充值</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">图标 (emoji，可选)</label>
+                    <input type="text" class="form-input" id="editProductIcon" maxlength="4" placeholder="例如 ⚡ 🚀 🔑">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">品牌色 HEX (可选)</label>
+                    <input type="text" class="form-input" id="editProductAccentColor" maxlength="7" placeholder="例如 #c7ff6b">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" id="editProductIsFeatured" style="width:auto;">
+                        标记为「最多人选」（前台显示徽章 + 排序置顶）
+                    </label>
+                </div>
                 <div class="btn-group">
                     <button type="button" class="btn btn-secondary" onclick="closeEditProductModal()">取消</button>
                     <button type="submit" class="btn">保存修改</button>
@@ -458,6 +584,6 @@
         </div>
     </div>
 
-    <script src="/js/admin.js?v=20260404"></script>
+    <script src="/js/admin.js?v=20260415"></script>
 </body>
 </html>

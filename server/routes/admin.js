@@ -19,19 +19,31 @@ router.use(authenticateToken, requireAdmin);
 // 商品管理
 // ============================================
 
+// 清洗 accent_color 为有效 HEX，否则返回空
+function normalizeHex(raw) {
+    if (!raw) return '';
+    const v = String(raw).trim();
+    return /^#[0-9a-fA-F]{6}$/.test(v) ? v : '';
+}
+
 // 添加商品
 router.post('/products', async (req, res) => {
     try {
-        const { name, description, price, delivery_type } = req.body;
+        const { name, description, price, delivery_type, is_featured, icon, accent_color } = req.body;
 
         if (!name || !price) {
             return res.status(400).json({ error: '商品名称和价格不能为空' });
         }
 
         const result = await dbRun(`
-            INSERT INTO products (name, description, price, stock, status, delivery_type)
-            VALUES (?, ?, ?, 0, 'out_of_stock', ?)
-        `, [name, description, price, delivery_type || 'email']);
+            INSERT INTO products (name, description, price, stock, status, delivery_type, is_featured, icon, accent_color)
+            VALUES (?, ?, ?, 0, 'out_of_stock', ?, ?, ?, ?)
+        `, [
+            name, description, price, delivery_type || 'email',
+            is_featured ? 1 : 0,
+            String(icon || '').trim().slice(0, 8),
+            normalizeHex(accent_color)
+        ]);
 
         auditLog(req.user.email, 'ADD_PRODUCT', `id=${result.id} name=${name} price=${price}`);
         res.status(201).json({
@@ -48,13 +60,28 @@ router.post('/products', async (req, res) => {
 router.put('/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, price, status, delivery_type } = req.body;
+        const { name, description, price, status, delivery_type, is_featured, icon, accent_color } = req.body;
 
         await dbRun(`
             UPDATE products
-            SET name = ?, description = ?, price = ?, status = ?, delivery_type = COALESCE(?, delivery_type), updated_at = CURRENT_TIMESTAMP
+            SET name = ?,
+                description = ?,
+                price = ?,
+                status = ?,
+                delivery_type = COALESCE(?, delivery_type),
+                is_featured = ?,
+                icon = ?,
+                accent_color = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `, [name, description, price, status, delivery_type || null, id]);
+        `, [
+            name, description, price, status,
+            delivery_type || null,
+            is_featured ? 1 : 0,
+            String(icon || '').trim().slice(0, 8),
+            normalizeHex(accent_color),
+            id
+        ]);
 
         auditLog(req.user.email, 'UPDATE_PRODUCT', `id=${id} name=${name}`);
         res.json({ message: '商品更新成功' });
@@ -391,6 +418,166 @@ router.get('/stats', async (req, res) => {
     } catch (error) {
         console.error('查询统计数据错误:', error);
         res.status(500).json({ error: '查询统计数据失败' });
+    }
+});
+
+// ============================================
+// 买家邮箱黑名单
+// ============================================
+
+// 列表
+router.get('/blocked-emails', async (req, res) => {
+    try {
+        const rows = await dbAll(
+            'SELECT email, reason, created_at FROM blocked_emails ORDER BY created_at DESC'
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error('查询黑名单错误:', err);
+        res.status(500).json({ error: '查询失败' });
+    }
+});
+
+// 添加
+router.post('/blocked-emails', async (req, res) => {
+    try {
+        const email = String(req.body.email || '').trim().toLowerCase();
+        const reason = String(req.body.reason || '').trim().slice(0, 200);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ error: '请填写正确的邮箱地址' });
+        }
+        await dbRun(
+            'INSERT OR REPLACE INTO blocked_emails (email, reason, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+            [email, reason || null]
+        );
+        auditLog(req.user.email, 'BLOCK_EMAIL', `${email} reason=${reason}`);
+        res.json({ message: '已加入黑名单', email });
+    } catch (err) {
+        console.error('添加黑名单错误:', err);
+        res.status(500).json({ error: '添加失败' });
+    }
+});
+
+// 移除
+router.delete('/blocked-emails/:email', async (req, res) => {
+    try {
+        const email = decodeURIComponent(req.params.email).toLowerCase();
+        const result = await dbRun('DELETE FROM blocked_emails WHERE email = ?', [email]);
+        if (!result.changes) {
+            return res.status(404).json({ error: '该邮箱不在黑名单' });
+        }
+        auditLog(req.user.email, 'UNBLOCK_EMAIL', email);
+        res.json({ message: '已移除' });
+    } catch (err) {
+        console.error('移除黑名单错误:', err);
+        res.status(500).json({ error: '移除失败' });
+    }
+});
+
+// ============================================
+// 邀请返现
+// ============================================
+
+function genRefCode() {
+    return 'R' + Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+// 列出所有邀请码 + 汇总（订单数、累计金额、累计佣金、待结算）
+router.get('/referrals/codes', async (req, res) => {
+    try {
+        const rows = await dbAll(`
+            SELECT rc.code, rc.referrer_name, rc.referrer_contact, rc.commission_rate, rc.note, rc.is_active, rc.created_at,
+                   COUNT(rr.id) AS orders_count,
+                   COALESCE(SUM(rr.order_amount), 0) AS total_amount,
+                   COALESCE(SUM(rr.commission), 0) AS total_commission,
+                   COALESCE(SUM(CASE WHEN rr.status='pending' THEN rr.commission ELSE 0 END), 0) AS pending_commission
+            FROM referral_codes rc
+            LEFT JOIN referral_records rr ON rc.code = rr.referral_code
+            GROUP BY rc.code
+            ORDER BY rc.created_at DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        console.error('查询邀请码错误:', err);
+        res.status(500).json({ error: '查询失败' });
+    }
+});
+
+// 创建邀请码
+router.post('/referrals/codes', async (req, res) => {
+    try {
+        const { referrer_name, referrer_contact, commission_rate, note, code: customCode } = req.body;
+        const code = customCode ? String(customCode).trim().slice(0, 32) : genRefCode();
+        if (!/^[A-Za-z0-9_-]{4,32}$/.test(code)) {
+            return res.status(400).json({ error: '邀请码格式错误（4-32 位字母数字）' });
+        }
+        const rate = Math.max(0, Math.min(1, parseFloat(commission_rate) || 0.10));
+        await dbRun(`
+            INSERT INTO referral_codes (code, referrer_name, referrer_contact, commission_rate, note)
+            VALUES (?, ?, ?, ?, ?)
+        `, [code, (referrer_name || '').trim().slice(0, 80), (referrer_contact || '').trim().slice(0, 120), rate, (note || '').trim().slice(0, 200)]);
+        auditLog(req.user.email, 'CREATE_REFERRAL', `code=${code} name=${referrer_name}`);
+        res.json({ message: '已创建', code });
+    } catch (err) {
+        if (err.message?.includes('UNIQUE')) {
+            return res.status(409).json({ error: '该邀请码已存在' });
+        }
+        console.error('创建邀请码错误:', err);
+        res.status(500).json({ error: '创建失败' });
+    }
+});
+
+// 启用/禁用
+router.post('/referrals/codes/:code/toggle', async (req, res) => {
+    try {
+        const code = req.params.code;
+        const existing = await dbGet('SELECT is_active FROM referral_codes WHERE code = ?', [code]);
+        if (!existing) return res.status(404).json({ error: '邀请码不存在' });
+        const newState = existing.is_active ? 0 : 1;
+        await dbRun('UPDATE referral_codes SET is_active = ? WHERE code = ?', [newState, code]);
+        auditLog(req.user.email, 'TOGGLE_REFERRAL', `code=${code} active=${newState}`);
+        res.json({ message: '已切换', is_active: newState });
+    } catch (err) {
+        console.error('切换邀请码错误:', err);
+        res.status(500).json({ error: '操作失败' });
+    }
+});
+
+// 返现记录列表
+router.get('/referrals/records', async (req, res) => {
+    try {
+        const code = req.query.code || '';
+        const whereClause = code ? 'WHERE rr.referral_code = ?' : '';
+        const params = code ? [code] : [];
+        const rows = await dbAll(`
+            SELECT rr.id, rr.referral_code, rr.order_id, rr.buyer_email,
+                   rr.order_amount, rr.commission, rr.status, rr.created_at,
+                   o.transaction_id,
+                   rc.referrer_name
+            FROM referral_records rr
+            LEFT JOIN orders o ON rr.order_id = o.id
+            LEFT JOIN referral_codes rc ON rr.referral_code = rc.code
+            ${whereClause}
+            ORDER BY rr.created_at DESC
+            LIMIT 200
+        `, params);
+        res.json(rows);
+    } catch (err) {
+        console.error('查询返现记录错误:', err);
+        res.status(500).json({ error: '查询失败' });
+    }
+});
+
+// 标记某条记录为已结算
+router.post('/referrals/records/:id/mark-paid', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        await dbRun("UPDATE referral_records SET status = 'paid' WHERE id = ?", [id]);
+        auditLog(req.user.email, 'PAY_REFERRAL', `id=${id}`);
+        res.json({ message: '已标记为已结算' });
+    } catch (err) {
+        console.error('标记返现错误:', err);
+        res.status(500).json({ error: '操作失败' });
     }
 });
 

@@ -6,6 +6,7 @@
     <title>商品详情 - 数字商店</title>
     <link rel="canonical" id="canonicalLink" href="">
     <meta name="description" id="metaDesc" content="数字商店优质商品，安全快捷，自动发卡。">
+    <!--SEO_HEAD-->
     <style>
         :root {
             --bg: #0b0d10;
@@ -554,16 +555,128 @@
 
         @media (max-width: 720px) {
             .site-header-inner {
-                min-height: 68px;
+                min-height: 60px;
                 flex-wrap: wrap;
                 justify-content: space-between;
                 padding: 0.55rem 0;
+            }
+
+            .page-shell {
+                width: min(calc(100% - 24px), var(--max-width));
+                padding: 1.5rem 0 3rem;
             }
 
             .summary-meta,
             .stats-grid,
             .qty-row {
                 grid-template-columns: 1fr;
+            }
+
+            /* 进度条适配 */
+            .steps-bar {
+                padding: 0.9rem 0.8rem;
+                margin-bottom: 1.2rem;
+            }
+
+            .step-label {
+                font-size: 0.72rem;
+            }
+
+            .step-line {
+                width: 1.8rem;
+                margin: 0 0.3rem;
+            }
+
+            .step-circle {
+                width: 1.7rem;
+                height: 1.7rem;
+                font-size: 0.72rem;
+            }
+
+            /* 面板内容 */
+            .panel-body,
+            .buy-body {
+                padding: 1rem;
+            }
+
+            .product-title {
+                font-size: clamp(1.2rem, 5vw, 1.8rem);
+            }
+
+            .product-header {
+                flex-direction: column;
+                gap: 0.6rem;
+            }
+
+            /* 统计格子 */
+            .stats-grid {
+                gap: 0.5rem;
+            }
+
+            .stat-box {
+                padding: 0.75rem;
+            }
+
+            .stat-value {
+                font-size: 1.2rem;
+            }
+
+            /* 阶梯优惠表格 */
+            .tiers-table thead th,
+            .tiers-table td {
+                padding: 0.6rem 0.6rem;
+                font-size: 0.76rem;
+            }
+
+            /* 支付按钮 */
+            .pay-btn {
+                min-height: 2.8rem;
+                font-size: 0.88rem;
+            }
+
+            .info-tip {
+                font-size: 0.78rem;
+                padding: 0.8rem;
+            }
+
+            /* 数量行恢复两列 */
+            .qty-row {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .total-value {
+                font-size: 1.1rem;
+            }
+
+            .window-bar {
+                padding: 0.75rem 1rem;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .step-label {
+                font-size: 0.65rem;
+            }
+
+            .step-line {
+                width: 1.2rem;
+                margin: 0 0.2rem;
+            }
+
+            .step-circle {
+                width: 1.5rem;
+                height: 1.5rem;
+                font-size: 0.65rem;
+            }
+
+            .qty-row {
+                grid-template-columns: 1fr;
+            }
+
+            .tiers-table thead th,
+            .tiers-table td {
+                padding: 0.5rem 0.45rem;
+                font-size: 0.7rem;
             }
         }
     </style>
@@ -645,23 +758,7 @@ async function loadProduct() {
         const metaDesc = document.getElementById('metaDesc');
         if (metaDesc) metaDesc.content = `${product.name} - ${product.description || '数字商店优质商品，安全快捷，自动发卡。'}`;
 
-        // SEO: JSON-LD 结构化数据
-        const jsonLd = document.createElement('script');
-        jsonLd.type = 'application/ld+json';
-        jsonLd.textContent = JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Product",
-            "name": product.name,
-            "description": product.description || '',
-            "offers": {
-                "@type": "Offer",
-                "price": product.price,
-                "priceCurrency": "CNY",
-                "availability": product.status === 'in_stock' ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
-            }
-        });
-        document.head.appendChild(jsonLd);
-
+        // JSON-LD 由服务端在 /product/:id 路由注入（SSR，见 server/index.js），这里不再客户端插入
         renderPage();
     } catch (e) {
         document.getElementById('app').innerHTML = `
@@ -913,6 +1010,11 @@ async function submitOrder(paymentMethod) {
     try {
         const body = { productId: product.id, quantity: qty, email, paymentMethod };
         if (chatgptToken) body.chatgptToken = chatgptToken;
+        // 邀请码归因：从 URL ?ref= 或 localStorage 取
+        const refFromUrl = new URL(location.href).searchParams.get('ref');
+        const refStored = localStorage.getItem('referralCode');
+        const ref = refFromUrl || refStored;
+        if (ref) body.referralCode = ref;
 
         const res = await fetch(`${API}/orders/guest-create`, {
             method: 'POST',

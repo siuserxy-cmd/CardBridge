@@ -19,6 +19,17 @@ const PRODUCT_CARD_THEMES = [
 // ============================================
 // 初始化
 // ============================================
+// 邀请码捕获：访问时带 ?ref= 则持久化到 localStorage，供后续下单归因使用
+(function captureReferralCode() {
+    try {
+        const ref = new URL(location.href).searchParams.get('ref');
+        if (ref && /^[A-Za-z0-9_-]{4,32}$/.test(ref)) {
+            localStorage.setItem('referralCode', ref);
+            localStorage.setItem('referralCodeAt', String(Date.now()));
+        }
+    } catch (_) {}
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
     loadProducts();
@@ -135,40 +146,39 @@ async function loadProducts() {
             return;
         }
 
-        grid.innerHTML = products.map((product, index) => {
-            const themeClass = getProductCardTheme(product, index);
+        grid.innerHTML = products.map((product) => {
+            const accent = /^#[0-9a-fA-F]{6}$/.test(product.accent_color || '') ? product.accent_color : '';
+            const cardStyle = accent ? ` style="--pc-accent:${accent};"` : '';
+            const icon = (product.icon || '').trim() || '◆';
+            const featuredRibbon = product.is_featured
+                ? '<span class="featured-ribbon">⭐ 最多人选</span>'
+                : '';
+            const inStock = product.status === 'in_stock';
 
             return `
-            <article class="product-card ${themeClass}" onclick="location.href='/product.html?id=${product.id}'">
-                <div class="card-content">
-                    <div class="card-header">
+            <article class="product-card${product.is_featured ? ' is-featured' : ''}"${cardStyle} onclick="location.href='/product/${product.id}'">
+                ${featuredRibbon}
+                <div class="card-top">
+                    <div class="card-icon">${escapeHtml(icon)}</div>
+                    <div class="card-heading">
                         <h3 class="card-title">${escapeHtml(product.name)}</h3>
-                        <span class="status-badge ${product.status}">
-                            ${product.status === 'in_stock' ? '有货' : '售罄'}
-                        </span>
+                        <div class="card-price">¥${product.price.toFixed(2)}<span class="card-price-unit">/件</span></div>
                     </div>
-                    <p class="card-description">${escapeHtml(product.description || '')}</p>
-                    <div class="card-stats-row">
-                        <div class="card-stat">
-                            <div class="card-stat-label">单价</div>
-                            <div class="card-stat-value price">¥${product.price.toFixed(2)}</div>
-                        </div>
-                        <div class="card-stat">
-                            <div class="card-stat-label">已售</div>
-                            <div class="card-stat-value sold">${product.sold_count || 0}<small style="font-size:0.7rem;color:var(--text-dim);"> 件</small></div>
-                        </div>
-                        <div class="card-stat">
-                            <div class="card-stat-label">库存</div>
-                            <div class="card-stat-value stock">${product.stock}<small style="font-size:0.7rem;color:var(--text-dim);"> 件</small></div>
-                        </div>
+                </div>
+                <p class="card-description">${escapeHtml(product.description || '')}</p>
+                <div class="card-meta-row">
+                    <div class="card-meta-item">已售 <b>${product.sold_count || 0}</b></div>
+                    <div class="card-meta-item">库存 <b>${product.stock}</b></div>
+                    <div class="card-meta-item" style="margin-left:auto;">
+                        <span class="status-badge ${product.status}">${inStock ? '有货' : '售罄'}</span>
                     </div>
-                    <div class="card-footer">
-                        <button class="btn-buy" style="width:100%"
-                            onclick="event.stopPropagation(); location.href='/product.html?id=${product.id}'"
-                            ${product.status !== 'in_stock' ? 'disabled' : ''}>
-                            ${product.status === 'in_stock' ? '查看详情' : '暂无库存'}
-                        </button>
-                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn-buy"
+                        onclick="event.stopPropagation(); location.href='/product/${product.id}'"
+                        ${!inStock ? 'disabled' : ''}>
+                        ${inStock ? '立即购买 →' : '暂无库存'}
+                    </button>
                 </div>
             </article>
         `;

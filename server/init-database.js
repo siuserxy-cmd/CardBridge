@@ -125,11 +125,22 @@ async function initDatabase() {
                             created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
                             FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
                         )
-                    `, async (err2) => {
+                    `, (err2) => {
                         if (err2) console.error('❌ 创建阶梯定价表失败:', err2.message);
                         else console.log('✅ 阶梯定价表创建成功');
-                        await insertDefaultData();
-                        resolve();
+                        // 6. 买家邮箱黑名单
+                        db.run(`
+                            CREATE TABLE IF NOT EXISTS blocked_emails (
+                                email       TEXT PRIMARY KEY,
+                                reason      TEXT,
+                                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+                            )
+                        `, async (err3) => {
+                            if (err3) console.error('❌ 创建黑名单表失败:', err3.message);
+                            else console.log('✅ 黑名单表创建成功');
+                            await insertDefaultData();
+                            resolve();
+                        });
                     });
                 }
             });

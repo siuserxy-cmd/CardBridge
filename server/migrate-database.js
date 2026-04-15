@@ -198,6 +198,64 @@ async function migrate() {
         '创建 cards(product_id, status) 复合索引'
     );
 
+    // 16. 买家邮箱黑名单（反滥用 / 手动拉黑问题买家）
+    await safeRun(`
+        CREATE TABLE IF NOT EXISTS blocked_emails (
+            email TEXT PRIMARY KEY,
+            reason TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `, '创建 blocked_emails 表');
+
+    // 17. 商品视觉字段：is_featured 徽章、icon (emoji 或文字)、accent_color (HEX 主题色)
+    await safeRun(
+        `ALTER TABLE products ADD COLUMN is_featured INTEGER DEFAULT 0`,
+        'products 表添加 is_featured 字段'
+    );
+    await safeRun(
+        `ALTER TABLE products ADD COLUMN icon TEXT DEFAULT ''`,
+        'products 表添加 icon 字段'
+    );
+    await safeRun(
+        `ALTER TABLE products ADD COLUMN accent_color TEXT DEFAULT ''`,
+        'products 表添加 accent_color 字段'
+    );
+
+    // 18. 邀请返现系统
+    await safeRun(`
+        CREATE TABLE IF NOT EXISTS referral_codes (
+            code            TEXT PRIMARY KEY,
+            referrer_name   TEXT,
+            referrer_contact TEXT,
+            commission_rate REAL DEFAULT 0.10,
+            note            TEXT,
+            is_active       INTEGER DEFAULT 1,
+            created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `, '创建 referral_codes 表');
+    await safeRun(`
+        CREATE TABLE IF NOT EXISTS referral_records (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            referral_code TEXT NOT NULL,
+            order_id      INTEGER NOT NULL,
+            buyer_email   TEXT,
+            order_amount  REAL,
+            commission    REAL,
+            status        TEXT DEFAULT 'pending',
+            created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (referral_code) REFERENCES referral_codes(code),
+            FOREIGN KEY (order_id) REFERENCES orders(id)
+        )
+    `, '创建 referral_records 表');
+    await safeRun(
+        `CREATE INDEX IF NOT EXISTS idx_referral_records_code ON referral_records(referral_code)`,
+        '创建 referral_records.referral_code 索引'
+    );
+    await safeRun(
+        `ALTER TABLE orders ADD COLUMN referral_code TEXT`,
+        'orders 表添加 referral_code 字段'
+    );
+
     console.log('\n🎉 数据库迁移完成！');
     db.close();
     process.exit(0);

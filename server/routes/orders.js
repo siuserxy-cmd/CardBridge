@@ -164,11 +164,21 @@ function buildStatusResponse(order) {
     };
 }
 
-async function createReservedOrder({ userId = 0, buyerEmail = null, productId, quantity = 1, paymentMethod, chatgptToken = '' }) {
+async function createReservedOrder({ userId = 0, buyerEmail = null, productId, quantity = 1, paymentMethod, chatgptToken = '', referralCode = '' }) {
     await releaseExpiredReservations();
 
     const accessToken = generateSecureToken();
     const encryptedChatgptToken = chatgptToken ? encryptText(chatgptToken) : null;
+
+    // 归因：邀请码必须存在且 active 才会记录到订单
+    let validReferralCode = '';
+    if (referralCode) {
+        const ref = await dbGet(
+            'SELECT code FROM referral_codes WHERE code = ? AND is_active = 1',
+            [String(referralCode).trim()]
+        );
+        if (ref) validReferralCode = ref.code;
+    }
 
     return dbTransaction(async (runner) => {
         const product = await loadProductForCheckout(productId, runner);
@@ -207,9 +217,9 @@ async function createReservedOrder({ userId = 0, buyerEmail = null, productId, q
 
         await runner.dbRun(`
             UPDATE orders
-            SET transaction_id = ?, order_access_token_hash = ?, reservation_expires_at = ?
+            SET transaction_id = ?, order_access_token_hash = ?, reservation_expires_at = ?, referral_code = ?
             WHERE id = ?
-        `, [orderNo, hashToken(accessToken), reservationExpiresAt, orderId]);
+        `, [orderNo, hashToken(accessToken), reservationExpiresAt, validReferralCode || null, orderId]);
 
         const reservedCards = await runner.dbAll(`
             SELECT id
@@ -460,11 +470,35 @@ async function processPaymentSuccess(orderId, transactionId) {
         }
 
         await processRecharge({ ...order, chatgpt_token: decryptedToken }, cards, transactionId);
+        recordReferralIfAny(order).catch(err => console.warn('[referral] record failed:', err.message));
         return { paid: true, recharge: true };
     }
 
     await processCardDelivery(order, cards, transactionId);
+    recordReferralIfAny(order).catch(err => console.warn('[referral] record failed:', err.message));
     return { paid: true };
+}
+
+// 写入 referral_records（幂等：同一 order_id 不重复写）
+async function recordReferralIfAny(order) {
+    if (!order.referral_code) return;
+    const existing = await dbGet(
+        'SELECT id FROM referral_records WHERE order_id = ?',
+        [order.id]
+    );
+    if (existing) return;
+    const code = await dbGet(
+        'SELECT code, commission_rate FROM referral_codes WHERE code = ?',
+        [order.referral_code]
+    );
+    if (!code) return;
+    const rate = Number(code.commission_rate || 0.10);
+    const amount = Number(order.amount || 0);
+    const commission = parseFloat((amount * rate).toFixed(2));
+    await dbRun(`
+        INSERT INTO referral_records (referral_code, order_id, buyer_email, order_amount, commission, status)
+        VALUES (?, ?, ?, ?, ?, 'pending')
+    `, [code.code, order.id, order.buyer_email, amount, commission]);
 }
 
 function respondWithError(res, error, fallback = '操作失败，请稍后重试') {
@@ -477,10 +511,19 @@ function respondWithError(res, error, fallback = '操作失败，请稍后重试
 // ============================================
 router.post('/guest-create', async (req, res) => {
     try {
-        const { productId, quantity = 1, email, paymentMethod, chatgptToken } = req.body;
+        const { productId, quantity = 1, email, paymentMethod, chatgptToken, referralCode } = req.body;
 
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             return res.status(400).json({ error: '请填写正确的邮箱地址' });
+        }
+
+        // 黑名单校验：被拉黑的邮箱直接拒绝下单
+        const blocked = await dbGet(
+            'SELECT email FROM blocked_emails WHERE email = ?',
+            [email.toLowerCase()]
+        );
+        if (blocked) {
+            return res.status(403).json({ error: '该邮箱已被限制下单，如有疑问请联系客服' });
         }
 
         if (!['alipay', 'wechat'].includes(paymentMethod)) {
@@ -492,7 +535,8 @@ router.post('/guest-create', async (req, res) => {
             productId,
             quantity,
             paymentMethod,
-            chatgptToken
+            chatgptToken,
+            referralCode
         });
         const paymentInfo = await createPaymentForReservedOrder({ ...orderMeta, paymentMethod });
 
@@ -913,6 +957,74 @@ router.post('/wechat-callback', async (req, res) => {
     } catch (error) {
         console.error('微信支付回调错误:', error);
         res.status(500).json({ code: 'FAIL', message: '失败' });
+    }
+});
+
+// ============================================
+// Stripe 国际支付通道（可选 / feature-flag）
+// ============================================
+const stripeUtil = require('../utils/stripe');
+
+// 为已存在的订单创建 Stripe Checkout Session
+// 用法：下单后拿到 orderNo + accessToken，再调此接口切换到 Stripe 通道
+router.post('/stripe-checkout/:orderNo', async (req, res) => {
+    if (!stripeUtil.isEnabled()) {
+        return res.status(503).json({ error: 'Stripe 通道未启用' });
+    }
+    try {
+        const order = await dbGet(`
+            SELECT o.id, o.transaction_id, o.buyer_email, o.amount, o.payment_status,
+                   o.order_access_token_hash, p.name AS product_name
+            FROM orders o
+            JOIN products p ON o.product_id = p.id
+            WHERE o.transaction_id = ?
+        `, [req.params.orderNo]);
+        if (!order) return res.status(404).json({ error: '订单不存在' });
+        if (order.payment_status === 'paid') return res.status(409).json({ error: '订单已支付' });
+
+        const token = req.query.t || req.body?.t;
+        if (!token || !tokenMatchesHash(token, order.order_access_token_hash)) {
+            return res.status(403).json({ error: '访问令牌无效' });
+        }
+
+        const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+        const successUrl = `${appUrl}/order/${order.transaction_id}?t=${encodeURIComponent(token)}`;
+        const cancelUrl = `${appUrl}/payment/${order.transaction_id}?t=${encodeURIComponent(token)}`;
+
+        const session = await stripeUtil.createCheckoutSession({ order, successUrl, cancelUrl });
+        res.json(session);
+    } catch (err) {
+        console.error('[stripe checkout]', err);
+        res.status(500).json({ error: err.message || '创建 Stripe 会话失败' });
+    }
+});
+
+// Stripe Webhook：必须用原始 body 校验签名
+// 注意：路由需要在 bodyParser.json() 之前挂载，或用单独的 raw body parser
+router.post('/stripe-callback', async (req, res) => {
+    if (!stripeUtil.isEnabled()) return res.status(503).send('disabled');
+    const signature = req.headers['stripe-signature'];
+    const raw = req.rawBody || req.body; // rawBody 由 bodyParser verify 捕获
+    let event;
+    try {
+        event = stripeUtil.constructEvent(raw, signature);
+    } catch (err) {
+        console.warn('[stripe webhook] signature verify failed:', err.message);
+        return res.status(400).send('sig fail');
+    }
+    try {
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            const orderId = parseInt(session.client_reference_id || session.metadata?.order_id, 10);
+            const txId = session.metadata?.transaction_id || '';
+            if (orderId) {
+                await processPaymentSuccess(orderId, txId);
+            }
+        }
+        res.json({ received: true });
+    } catch (err) {
+        console.error('[stripe webhook handler]', err);
+        res.status(500).send('err');
     }
 });
 

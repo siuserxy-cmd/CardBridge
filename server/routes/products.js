@@ -21,11 +21,14 @@ router.get('/', async (req, res) => {
                 p.sold_count,
                 p.status,
                 p.delivery_type,
+                p.is_featured,
+                p.icon,
+                p.accent_color,
                 COUNT(c.id) as available_cards
             FROM products p
             LEFT JOIN cards c ON p.id = c.product_id AND c.status = 'available'
             GROUP BY p.id
-            ORDER BY p.created_at DESC
+            ORDER BY p.is_featured DESC, p.created_at DESC
         `);
 
         // 更新商品状态

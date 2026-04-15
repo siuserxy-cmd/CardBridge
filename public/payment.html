@@ -399,8 +399,73 @@
         }
 
         @media (max-width: 720px) {
-            .site-header-inner { min-height: 68px; }
-            .pay-body { padding: 1.5rem 1rem; }
+            .site-header-inner { min-height: 60px; }
+
+            .page-shell {
+                width: min(calc(100% - 24px), var(--max-width));
+                padding: 1.5rem 0 3rem;
+            }
+
+            .pay-body { padding: 1.2rem 1rem; }
+
+            .pay-title { font-size: 1.1rem; margin-bottom: 1rem; }
+
+            .order-info {
+                grid-template-columns: auto 1fr;
+                gap: 0.4rem 0.8rem;
+                padding: 0.9rem 1rem;
+                max-width: 100%;
+            }
+
+            .order-info-label { font-size: 0.78rem; }
+            .order-info-value { font-size: 0.82rem; }
+
+            /* 进度条适配 */
+            .steps-bar {
+                padding: 0.9rem 0.8rem;
+                margin-bottom: 1.2rem;
+            }
+
+            .step-label { font-size: 0.72rem; }
+
+            .step-line {
+                width: 1.8rem;
+                margin: 0 0.3rem;
+            }
+
+            .step-circle {
+                width: 1.7rem;
+                height: 1.7rem;
+                font-size: 0.72rem;
+            }
+
+            .qr-area {
+                max-width: 220px;
+                padding: 1rem;
+            }
+
+            .qr-hint { font-size: 0.78rem; }
+
+            .timer-bar {
+                font-size: 0.8rem;
+                padding: 0.55rem 1rem;
+            }
+
+            .status-msg { font-size: 0.78rem; }
+
+            .btn-test-pay { font-size: 0.85rem !important; padding: 0.65rem 1.4rem !important; }
+
+            .success-panel { padding: 1.5rem 1rem; }
+            .success-title { font-size: 1.1rem; }
+            .success-sub { font-size: 0.82rem; }
+
+            .window-bar { padding: 0.75rem 1rem; }
+        }
+
+        @media (max-width: 380px) {
+            .step-label { font-size: 0.65rem; }
+            .step-line { width: 1.2rem; margin: 0 0.2rem; }
+            .step-circle { width: 1.5rem; height: 1.5rem; font-size: 0.65rem; }
             .order-info { grid-template-columns: 1fr; gap: 0.3rem 0; }
             .order-info-value { text-align: left; }
         }
@@ -613,6 +678,12 @@ function renderPayment() {
                 </button>
                 ${contactInfo ? `<p style="margin-top:0.8rem;color:var(--text-dim);font-size:0.78rem;">${escHtml(contactInfo)}</p>` : ''}
                 ` : ''}
+                <div id="stripeRow" style="margin-top:1rem;display:none;">
+                    <div style="color:var(--text-dim);font-size:0.78rem;margin-bottom:0.5rem;">或用国际信用卡支付</div>
+                    <button class="btn-test-pay" onclick="payWithStripe()" style="background:rgba(99,102,241,0.16);color:#a5b4fc;border-color:rgba(99,102,241,0.4);">
+                        💳 Stripe 信用卡支付
+                    </button>
+                </div>
 
                 <div style="margin-top:1.2rem;">
                     <div class="timer-bar" id="timerBar">
@@ -639,6 +710,32 @@ function renderPayment() {
 
     startTimer();
     startPolling();
+
+    // 根据 /api/config/public 中的 stripeEnabled 决定是否显示 Stripe 按钮
+    fetch('/api/config/public').then(r => r.json()).then(c => {
+        if (c.stripeEnabled) {
+            const row = document.getElementById('stripeRow');
+            if (row) row.style.display = 'block';
+        }
+    }).catch(() => {});
+}
+
+async function payWithStripe() {
+    try {
+        const accessToken = new URL(location.href).searchParams.get('t') || '';
+        const resp = await fetch(`/api/orders/stripe-checkout/${encodeURIComponent(orderNo)}?t=${encodeURIComponent(accessToken)}`, {
+            method: 'POST'
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            alert(data.error || 'Stripe 会话创建失败');
+            return;
+        }
+        if (data.url) location.href = data.url;
+    } catch (err) {
+        console.error(err);
+        alert('无法启动 Stripe 支付');
+    }
 }
 
 function switchMethod(method) {

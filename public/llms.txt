@@ -1,0 +1,24 @@
+# 数字商店 (Digital Store)
+
+> 面向中国用户的数字商品自动发卡平台，主营 ChatGPT Plus 代充、各类海外软件账号、邮箱/接码服务。支付宝和微信扫码付款，无需海外信用卡，付款后自动发货。
+
+## 核心信息
+
+- 主站: https://api.difference-crossword.store/
+- 商品浏览: https://api.difference-crossword.store/#products
+- 订单查询: https://api.difference-crossword.store/lookup
+- 客服 (Telegram): https://t.me/siuser
+
+## 核心文档
+
+- [商品列表与说明](https://api.difference-crossword.store/): 全部在售商品、价格、库存、阶梯优惠
+- [FAQ 常见问题](https://api.difference-crossword.store/#faq): 代充流程、发货时效、退款政策、安全性
+- [订单查询](https://api.difference-crossword.store/lookup): 凭订单号与邮箱查询状态、重新获取卡密
+- [站点完整上下文 (llms-full.txt)](https://api.difference-crossword.store/llms-full.txt)
+
+## 业务简介
+
+- **主营品类**: ChatGPT Plus 代充、海外 AI/SaaS 订阅代充、邮箱账号、接码服务、其他数字卡密
+- **发货方式**: 卡密类付款后立即发邮箱；代充类付款后系统自动处理，通常 1 分钟内完成
+- **支付方式**: 支付宝、微信（扫码），人民币结算
+- **保障**: 充值失败全额退款；ChatGPT Token 加密传输，充值成功后立即从服务器删除，不留存
